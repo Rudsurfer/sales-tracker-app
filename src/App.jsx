@@ -848,7 +848,7 @@ const Dashboard = ({ sales, schedule, performanceGoals, stcData, t }) => {
             totalNetSales += sale.total;
             (sale.items || []).forEach(item => {
                 const rep = item.salesRep;
-                const itemValue = Number(item.total || 0);
+                const itemValue = Number(item.total || (item.price * item.quantity) || 0);
                 if(rep) {
                     employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
                 }
@@ -1896,7 +1896,7 @@ const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWe
                 if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
                 (sale.items || []).forEach(item => {
                     if (item.salesRep === row.name) {
-                        employeeSales += Number(item.total || 0);
+                        employeeSales += Number(item.total || (item.price * item.quantity) || 0);
                     }
                 });
             });
@@ -2217,7 +2217,7 @@ const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, curre
                     if (!categoryTotals[item.category]) {
                         categoryTotals[item.category] = 0;
                     }
-                    categoryTotals[item.category] += Number(item.total || 0);
+                    categoryTotals[item.category] += Number(item.total || (item.price * item.quantity) || 0);
                 });
             }
         });
@@ -2259,7 +2259,7 @@ const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, curre
             
             (sale.items || []).forEach(item => {
                 const rep = item.salesRep;
-                const itemValue = Number(item.total || 0);
+                const itemValue = Number(item.total || (item.price * item.quantity) || 0);
 
                 if (employeeAnalysis.has(rep)) {
                     const emp = employeeAnalysis.get(rep);
