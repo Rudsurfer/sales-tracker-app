@@ -178,6 +178,12 @@ const translations = {
         addTask: "Add Task",
         soldBy: "Sold By",
         salesContributionByCategory: 'Sales Contribution by Category',
+        Outerwear: 'Outerwear',
+        Footwear: 'Footwear',
+        Handbags: 'Handbags',
+        Accessories: 'Accessories',
+        Clothing: 'Clothing',
+        CP: 'CP',
     },
     fr: {
         dashboard: 'Tableau de Bord',
@@ -328,6 +334,12 @@ const translations = {
         addTask: "Ajouter une Tâche",
         soldBy: "Vendu par",
         salesContributionByCategory: 'Contribution des Ventes par Catégorie',
+        Outerwear: 'Manteaux',
+        Footwear: 'Chaussures',
+        Handbags: 'Sacs à main',
+        Accessories: 'Accessoires',
+        Clothing: 'Vêtements',
+        CP: 'PC',
     }
 };
 
@@ -930,7 +942,7 @@ const Dashboard = ({ sales, schedule, performanceGoals, stcData, t }) => {
                             <div key={cat.name} className="flex justify-between items-center text-sm">
                                 <div className="flex items-center">
                                     <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                                    <span className="text-gray-300">{cat.name}</span>
+                                    <span className="text-gray-300">{t[cat.name] || cat.name}</span>
                                 </div>
                                 <span className="font-bold text-white">{formatCurrency(cat.value)}</span>
                             </div>
@@ -1358,7 +1370,7 @@ const DailySalesLog = ({ sales, schedule, currentWeek, currentYear, db, appId, s
                                                     <tbody>
                                                         {(sale.items || []).map((item, idx) => (
                                                             <tr key={idx} className="border-b border-gray-700/50">
-                                                                <td className="px-4 py-2">{item.description}</td><td className="px-4 py-2">{item.category}</td><td className="px-4 py-2 text-right">{item.quantity}</td><td className="px-4 py-2 text-left">{item.salesRep}</td><td className="px-4 py-2 text-right">{formatCurrency(item.total)}</td>
+                                                                <td className="px-4 py-2">{item.description}</td><td className="px-4 py-2">{t[item.category] || item.category}</td><td className="px-4 py-2 text-right">{item.quantity}</td><td className="px-4 py-2 text-left">{item.salesRep}</td><td className="px-4 py-2 text-right">{formatCurrency(item.total)}</td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
@@ -1435,7 +1447,7 @@ const AddSaleForm = ({ scheduledEmployees, onAddSale, transactionType, t }) => {
                     <div key={item.id} className="grid grid-cols-12 gap-2 items-center">
                         <input type="text" placeholder={t.description} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} className="col-span-3 bg-gray-800 border border-gray-600 rounded-md px-3 py-2" />
                         <select value={item.category} onChange={e => handleItemChange(item.id, 'category', e.target.value)} className="col-span-2 bg-gray-800 border border-gray-600 rounded-md px-3 py-2">
-                            {SALE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {SALE_CATEGORIES.map(c => <option key={c} value={c}>{t[c] || c}</option>)}
                         </select>
                         <input type="number" placeholder={t.qty} value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', Number(e.target.value))} className="col-span-1 bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
                         <input type="number" placeholder={t.total} value={item.total} onChange={e => handleItemChange(item.id, 'total', Number(e.target.value))} className="col-span-2 bg-gray-800 border border-gray-600 rounded-md px-3 py-2" step="0.01" />
@@ -1523,7 +1535,7 @@ const AddReturnForm = ({ scheduledEmployees, onAddSale, t }) => {
                     <div key={item.id} className="grid grid-cols-12 gap-2 items-center">
                         <input type="text" placeholder={t.description} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} className="col-span-4 bg-gray-800 border border-gray-600 rounded-md px-3 py-2" />
                         <select value={item.category} onChange={e => handleItemChange(item.id, 'category', e.target.value)} className="col-span-3 bg-gray-800 border border-gray-600 rounded-md px-3 py-2">
-                            {SALE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {SALE_CATEGORIES.map(c => <option key={c} value={c}>{t[c] || c}</option>)}
                         </select>
                         <input type="number" placeholder={t.qty} value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', Number(e.target.value))} className="col-span-2 bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
                         <input type="number" placeholder={t.total} value={item.total} onChange={e => handleItemChange(item.id, 'total', Number(e.target.value))} className="col-span-2 bg-gray-800 border border-gray-600 rounded-md px-3 py-2" step="0.01" />
@@ -2348,7 +2360,7 @@ const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, curre
                     <h2 className="text-xl font-bold mb-4 text-white">{t.salesContributionByCategory}</h2>
                     <ResponsiveContainer width="100%" height={400}>
                         <PieChart>
-                            <Pie data={categoryContribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={150} fill="#8884d8" label={(entry) => `${entry.name} (${(entry.percent * 100).toFixed(0)}%)`}>
+                            <Pie data={categoryContribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={150} fill="#8884d8" label={(entry) => `${t[entry.name] || entry.name} (${(entry.percent * 100).toFixed(0)}%)`}>
                                 {categoryContribution.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
@@ -2392,7 +2404,7 @@ const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, curre
                                 <th className="px-2 py-3 text-right">{t.dph}</th>
                                 <th className="px-2 py-3 text-right">{t.dpt}</th>
                                 <th className="px-2 py-3 text-right">{t.upt}</th>
-                                {SALE_CATEGORIES.map(cat => <th key={cat} className="px-2 py-3 text-right">{cat.slice(0,5)}</th>)}
+                                {SALE_CATEGORIES.map(cat => <th key={cat} className="px-2 py-3 text-right">{t[cat] || cat.slice(0,5)}</th>)}
                             </tr>
                         </thead>
                         <tbody>
@@ -2440,7 +2452,7 @@ const TrendChart = ({ data, dataKey, title, color, formatter }) => (
     <div>
         <h3 className="text-lg font-semibold text-gray-200 mb-2">{title}</h3>
         <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#4A5568" />
                 <XAxis dataKey="name" stroke="#A0AEC0" />
                 <YAxis stroke="#A0AEC0" tickFormatter={formatter} />
