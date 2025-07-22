@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, where, writeBatch, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Calendar, Users, DollarSign, Clock, BarChart2, FileText, PlusCircle, Trash2, Save, TrendingUp, ChevronDown, ChevronUp, ClipboardList, ShoppingCart, Gift, UserCheck, Store, Shield, RefreshCw, LogOut, Target, X, Award, Percent, Hash, ChevronLeft, ChevronRight, UserCog, CheckCircle, UserPlus } from 'lucide-react';
+import { Calendar, Users, DollarSign, Clock, BarChart2, FileText, PlusCircle, Trash2, Save, TrendingUp, ChevronDown, ChevronUp, ClipboardList, ShoppingCart, Gift, UserCheck, Store, Shield, RefreshCw, LogOut, Target, X, Award, Percent, Hash, ChevronLeft, ChevronRight, UserCog, CheckCircle, UserPlus, Printer } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -184,14 +184,15 @@ const translations = {
         Accessories: 'Accessories',
         Clothing: 'Clothing',
         CP: 'CP',
-        addGuestEmployee: 'Add Guest Employee',
-        searchEmployee: 'Search for an employee...',
+        addGuestEmployee: 'Add Guest Associate',
+        searchEmployee: 'Search for an associate...',
         workLocations: 'Work Locations',
         transfersIn: 'Transfers In',
         homeStore: 'Home Store',
         earnings: 'Earnings',
         commission: 'Commission $',
         totalWages: 'Total Wages',
+        printSchedule: 'Print Schedule',
     },
     fr: {
         dashboard: 'Tableau de Bord',
@@ -348,14 +349,15 @@ const translations = {
         Accessories: 'Accessoires',
         Clothing: 'Vêtements',
         CP: 'PC',
-        addGuestEmployee: 'Ajouter un Employé Invité',
-        searchEmployee: 'Rechercher un employé...',
+        addGuestEmployee: 'Ajouter un Associé Invité',
+        searchEmployee: 'Rechercher un associé...',
         workLocations: 'Lieux de Travail',
         transfersIn: 'Transferts Entrants',
         homeStore: 'Magasin Principal',
         earnings: 'Gains',
         commission: 'Commission $',
         totalWages: 'Salaires Totaux',
+        printSchedule: 'Imprimer l\'Horaire',
     }
 };
 
@@ -401,6 +403,10 @@ const getWeekNumber = (d) => {
 
 const parseShift = (shift) => {
     if (!shift || typeof shift !== 'string' || shift.toLowerCase() === 'off' || shift.toLowerCase() === 'o') {
+        return 0;
+    }
+    const lowerCaseShift = shift.toLowerCase().trim();
+    if (['vacation', 'vac', 'v'].includes(lowerCaseShift)) {
         return 0;
     }
 
@@ -459,6 +465,11 @@ const parseShift = (shift) => {
     }
 
     return duration > 0 ? duration : 0;
+};
+
+const isVacation = (shiftValue = '') => {
+    const lowerCaseShift = shiftValue.toLowerCase().trim();
+    return ['vacation', 'vac', 'v'].includes(lowerCaseShift);
 };
 
 // --- Reusable UI Components ---
@@ -1712,20 +1723,31 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                             {t.addGuestEmployee}
                         </button>
                     </div>
-                    <SaveButton onClick={handleSaveClick} saveState={saveState} text={t.saveSchedule} />
+                     <div className="flex space-x-2">
+                        <button onClick={() => window.print()}
+                                className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            <Printer size={20} className="mr-2" />
+                            {t.printSchedule}
+                        </button>
+                        <SaveButton onClick={handleSaveClick} saveState={saveState} text={t.saveSchedule} />
+                    </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div id="schedule-print-area" className="overflow-x-auto">
+                    <div className="print-header hidden print:block text-black text-center mb-4">
+                        <h2 className="text-2xl font-bold">{t.salesTrackerTitle} - {t.store} {selectedStore}</h2>
+                        <h3 className="text-lg">{t.currentWeek}: {currentWeek}, {currentYear}</h3>
+                    </div>
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
                                 <th scope="col" className="px-4 py-3 align-top">{t.employeeId}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.jobTitleDescription}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
+                                <th scope="col" className="px-4 py-3 align-top print:hidden">{t.salesObjective}</th>
                                 {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
                                 <th scope="col" className="px-4 py-3 align-top">{t.totalSchedHrs}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.totalActualHrs}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.actions}</th>
+                                <th scope="col" className="px-4 py-3 align-top print:hidden">{t.actions}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1734,35 +1756,38 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                                 const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
                                 return (
                                     <tr key={row.id}>
-                                        <td className="px-4 py-2"><input type="text" placeholder="ID" value={row.employeeId || ''} onChange={e => handleRowChange(row.id, 'employeeId', e.target.value)} className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                        <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.name || ''} onChange={e => handleRowChange(row.id, 'name', e.target.value)} className="w-40 bg-gray-900 border border-gray-600 rounded-md px-2 py-1" /></td>
+                                        <td className="px-4 py-2"><input type="text" placeholder="ID" value={row.employeeId || ''} onChange={e => handleRowChange(row.id, 'employeeId', e.target.value)} className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none" /></td>
+                                        <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.name || ''} onChange={e => handleRowChange(row.id, 'name', e.target.value)} className="w-40 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none" /></td>
                                         <td className="px-4 py-2">
-                                            <select value={row.jobTitle} onChange={e => handleRowChange(row.id, 'jobTitle', e.target.value)} className="w-40 bg-gray-900 border border-gray-600 rounded-md px-2 py-1">
+                                            <select value={row.jobTitle} onChange={e => handleRowChange(row.id, 'jobTitle', e.target.value)} className="w-40 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none print:appearance-none">
                                                 {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
                                             </select>
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td className="px-4 py-2 print:hidden">
                                             <div className="flex items-center space-x-2">
                                                 <input type="number" placeholder={t.objective} value={row.objective || 0} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" />
                                                 <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300"><Target size={18}/></button>
                                             </div>
                                         </td>
-                                        {DAYS_OF_WEEK.map(day => (
+                                        {DAYS_OF_WEEK.map(day => {
+                                            const shiftValue = row.shifts?.[day.toLowerCase()] || '';
+                                            const vacationClass = isVacation(shiftValue) ? 'bg-blue-800 text-blue-200' : 'bg-gray-900/70';
+                                            return (
                                             <td key={day} className="px-2 py-2">
                                                 <div className="flex flex-col space-y-1">
-                                                    <input type="text" placeholder={t.shift} value={row.shifts?.[day.toLowerCase()] || ''} onChange={(e) => {
+                                                    <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => {
                                                         const newHours = parseShift(e.target.value);
                                                         handleRowChange(row.id, 'shifts', e.target.value, day.toLowerCase());
                                                         handleRowChange(row.id, 'scheduledHours', newHours, day.toLowerCase());
-                                                    }} className="w-24 bg-gray-900/70 border border-gray-600 rounded-md px-2 py-1 text-center" />
-                                                    <input type="number" placeholder={t.sched} value={row.scheduledHours?.[day.toLowerCase()] || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center" />
-                                                    <input type="number" placeholder={t.actual} value={row.actualHours?.[day.toLowerCase()] || ''} onChange={e => handleRowChange(row.id, 'actualHours', e.target.value, day.toLowerCase())} className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center" step="0.25" />
+                                                    }} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center print:bg-transparent print:border-gray-400 ${vacationClass}`} />
+                                                    <input type="number" placeholder={t.sched} value={row.scheduledHours?.[day.toLowerCase()] || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print:hidden" />
+                                                    <input type="number" placeholder={t.actual} value={row.actualHours?.[day.toLowerCase()] || ''} onChange={e => handleRowChange(row.id, 'actualHours', e.target.value, day.toLowerCase())} className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print:bg-transparent print:border-gray-400" step="0.25" />
                                                 </div>
                                             </td>
-                                        ))}
+                                        )})}
                                         <td className="px-4 py-2 text-center font-bold">{totalScheduledHours.toFixed(2)}</td>
                                         <td className="px-4 py-2 text-center font-bold">{totalActualHours.toFixed(2)}</td>
-                                        <td className="px-4 py-2 text-center">
+                                        <td className="px-4 py-2 text-center print:hidden">
                                             <button onClick={() => handleRemoveRow(row.id)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
                                         </td>
                                     </tr>
@@ -1783,6 +1808,40 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
             >
                 <p>{t.confirmSaveScheduleMsg}</p>
             </ConfirmationModal>
+            <style>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    #schedule-print-area, #schedule-print-area * {
+                        visibility: visible;
+                    }
+                    #schedule-print-area {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                    table {
+                        color: black;
+                    }
+                    thead {
+                        color: black;
+                        background-color: #eee !important;
+                    }
+                    input, select {
+                        border: 1px solid #ccc !important;
+                        background-color: white !important;
+                        color: black !important;
+                    }
+                    .print\\:hidden {
+                        display: none !important;
+                    }
+                    .print\\:block {
+                        display: block !important;
+                    }
+                }
+            `}</style>
         </>
     );
 };
