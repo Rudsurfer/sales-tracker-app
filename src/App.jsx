@@ -1740,13 +1740,13 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
-                                <th scope="col" className="px-4 py-3 align-top">{t.employeeId}</th>
+                                <th scope="col" className="px-4 py-3 align-top print:hidden">{t.employeeId}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.jobTitleDescription}</th>
+                                <th scope="col" className="px-4 py-3 align-top print:hidden">{t.jobTitleDescription}</th>
                                 <th scope="col" className="px-4 py-3 align-top print:hidden">{t.salesObjective}</th>
                                 {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
-                                <th scope="col" className="px-4 py-3 align-top">{t.totalSchedHrs}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.totalActualHrs}</th>
+                                <th scope="col" className="px-4 py-3 align-top print:hidden">{t.totalSchedHrs}</th>
+                                <th scope="col" className="px-4 py-3 align-top print:hidden">{t.totalActualHrs}</th>
                                 <th scope="col" className="px-4 py-3 align-top print:hidden">{t.actions}</th>
                             </tr>
                         </thead>
@@ -1756,9 +1756,9 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                                 const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
                                 return (
                                     <tr key={row.id}>
-                                        <td className="px-4 py-2"><input type="text" placeholder="ID" value={row.employeeId || ''} onChange={e => handleRowChange(row.id, 'employeeId', e.target.value)} className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none" /></td>
+                                        <td className="px-4 py-2 print:hidden"><input type="text" placeholder="ID" value={row.employeeId || ''} onChange={e => handleRowChange(row.id, 'employeeId', e.target.value)} className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none" /></td>
                                         <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.name || ''} onChange={e => handleRowChange(row.id, 'name', e.target.value)} className="w-40 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none" /></td>
-                                        <td className="px-4 py-2">
+                                        <td className="px-4 py-2 print:hidden">
                                             <select value={row.jobTitle} onChange={e => handleRowChange(row.id, 'jobTitle', e.target.value)} className="w-40 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 print:bg-transparent print:border-none print:appearance-none">
                                                 {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
                                             </select>
@@ -1785,8 +1785,8 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                                                 </div>
                                             </td>
                                         )})}
-                                        <td className="px-4 py-2 text-center font-bold">{totalScheduledHours.toFixed(2)}</td>
-                                        <td className="px-4 py-2 text-center font-bold">{totalActualHours.toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-center font-bold print:hidden">{totalScheduledHours.toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-center font-bold print:hidden">{totalActualHours.toFixed(2)}</td>
                                         <td className="px-4 py-2 text-center print:hidden">
                                             <button onClick={() => handleRemoveRow(row.id)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
                                         </td>
