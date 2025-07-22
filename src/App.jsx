@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, where, writeBatch, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Calendar, Users, DollarSign, Clock, BarChart2, FileText, PlusCircle, Trash2, Save, TrendingUp, ChevronDown, ChevronUp, ClipboardList, ShoppingCart, Gift, UserCheck, Store, Shield, RefreshCw, LogOut, Target, X, Award, Percent, Hash, ChevronLeft, ChevronRight, UserCog, CheckCircle } from 'lucide-react';
+import { Calendar, Users, DollarSign, Clock, BarChart2, FileText, PlusCircle, Trash2, Save, TrendingUp, ChevronDown, ChevronUp, ClipboardList, ShoppingCart, Gift, UserCheck, Store, Shield, RefreshCw, LogOut, Target, X, Award, Percent, Hash, ChevronLeft, ChevronRight, UserCog, CheckCircle, UserPlus } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -184,6 +184,14 @@ const translations = {
         Accessories: 'Accessories',
         Clothing: 'Clothing',
         CP: 'CP',
+        addGuestEmployee: 'Add Guest Employee',
+        searchEmployee: 'Search for an employee...',
+        workLocations: 'Work Locations',
+        transfersIn: 'Transfers In',
+        homeStore: 'Home Store',
+        earnings: 'Earnings',
+        commission: 'Commission $',
+        totalWages: 'Total Wages',
     },
     fr: {
         dashboard: 'Tableau de Bord',
@@ -340,6 +348,14 @@ const translations = {
         Accessories: 'Accessoires',
         Clothing: 'Vêtements',
         CP: 'PC',
+        addGuestEmployee: 'Ajouter un Employé Invité',
+        searchEmployee: 'Rechercher un employé...',
+        workLocations: 'Lieux de Travail',
+        transfersIn: 'Transferts Entrants',
+        homeStore: 'Magasin Principal',
+        earnings: 'Gains',
+        commission: 'Commission $',
+        totalWages: 'Salaires Totaux',
     }
 };
 
@@ -1591,11 +1607,12 @@ const AddGiftCardForm = ({ scheduledEmployees, onAddSale, t }) => {
     );
 };
 
-const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore, setNotification, t, language }) => {
+const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore, setNotification, t, language, allEmployees }) => {
     const [scheduleRows, setScheduleRows] = useState([]);
     const [editingObjectivesFor, setEditingObjectivesFor] = useState(null);
     const [saveState, setSaveState] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
     useEffect(() => {
@@ -1622,6 +1639,26 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
     const handleAddRow = () => {
         const newRow = { id: crypto.randomUUID(), name: '', employeeId: '', jobTitle: JOB_TITLES[0], objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {} };
         setScheduleRows(rows => [...rows, newRow]);
+    };
+
+    const handleAddGuest = (employee) => {
+        if (scheduleRows.some(r => r.id === employee.id)) {
+            setNotification({message: `${employee.name} is already on this schedule.`, type: 'error'});
+            return;
+        }
+        const newRow = { 
+            id: employee.id, 
+            name: employee.name, 
+            employeeId: employee.positionId, 
+            jobTitle: employee.jobTitle, 
+            objective: 0, 
+            shifts: {}, 
+            scheduledHours: {}, 
+            actualHours: {}, 
+            dailyObjectives: {} 
+        };
+        setScheduleRows(rows => [...rows, newRow]);
+        setIsGuestModalOpen(false);
     };
 
     const handleRemoveRow = (id) => {
@@ -1662,7 +1699,19 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
     return (
         <>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex space-x-2">
+                        <button onClick={handleAddRow}
+                                className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            <PlusCircle size={20} className="mr-2" />
+                            {t.addToSchedule}
+                        </button>
+                         <button onClick={() => setIsGuestModalOpen(true)}
+                                className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            <UserPlus size={20} className="mr-2" />
+                            {t.addGuestEmployee}
+                        </button>
+                    </div>
                     <SaveButton onClick={handleSaveClick} saveState={saveState} text={t.saveSchedule} />
                 </div>
                 <div className="overflow-x-auto">
@@ -1721,15 +1770,9 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                             })}
                         </tbody>
                     </table>
-                    <div className="mt-4">
-                        <button onClick={handleAddRow}
-                                className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <PlusCircle size={20} className="mr-2" />
-                            {t.addToSchedule}
-                        </button>
-                    </div>
                 </div>
             </div>
+            {isGuestModalOpen && <AddGuestModal allEmployees={allEmployees} scheduleRows={scheduleRows} onAddGuest={handleAddGuest} onClose={() => setIsGuestModalOpen(false)} t={t} />}
             {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
@@ -1741,6 +1784,47 @@ const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore
                 <p>{t.confirmSaveScheduleMsg}</p>
             </ConfirmationModal>
         </>
+    );
+};
+
+const AddGuestModal = ({ allEmployees, scheduleRows, onAddGuest, onClose, t }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const scheduledEmployeeIds = useMemo(() => new Set(scheduleRows.map(r => r.id)), [scheduleRows]);
+    
+    const availableGuests = useMemo(() => {
+        return allEmployees.filter(emp => 
+            !scheduledEmployeeIds.has(emp.id) &&
+            (emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || emp.positionId.includes(searchTerm))
+        );
+    }, [allEmployees, scheduledEmployeeIds, searchTerm]);
+
+    return (
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-lg">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">{t.addGuestEmployee}</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
+                </div>
+                <input 
+                    type="text"
+                    placeholder={t.searchEmployee}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 mb-4"
+                />
+                <div className="max-h-96 overflow-y-auto">
+                    {availableGuests.map(emp => (
+                        <div key={emp.id} className="flex items-center justify-between p-2 hover:bg-gray-700/50 rounded-lg">
+                            <div>
+                                <p className="font-bold">{emp.name}</p>
+                                <p className="text-sm text-gray-400">{emp.jobTitle} - {t.store} {emp.associatedStore}</p>
+                            </div>
+                            <button onClick={() => onAddGuest(emp)} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-lg"><PlusCircle size={16} className="mr-2"/> Add</button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -1888,40 +1972,60 @@ const STC = ({ stcData, currentWeek, currentYear, db, appId, selectedStore, setN
     );
 };
 
-const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWeek, currentYear, db, appId, selectedStore, setNotification, t }) => {
+const Payroll = ({ schedule, allWeeklySales, allWeeklySchedules, allEmployees, payroll, setPayroll, currentWeek, currentYear, db, appId, selectedStore, setNotification, t }) => {
     const [payrollData, setPayrollData] = useState([]);
+    const [transfersInData, setTransfersInData] = useState([]);
     const [saveState, setSaveState] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     useEffect(() => {
-        if (!allEmployees) return;
-        const initialData = schedule.rows.map(row => {
-            const existingPayroll = payroll.rows?.find(p => p.id === row.id) || {};
-            const employeeData = allEmployees.find(emp => emp.id === row.id);
+        if (!allEmployees || !allWeeklySchedules || !allWeeklySales) return;
+        
+        const homeStoreEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
 
-            const totalHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+        const initialData = homeStoreEmployees.map(employee => {
+            const existingPayroll = payroll.rows?.find(p => p.id === employee.id) || {};
+            
+            let totalHours = 0;
+            let workLocations = new Set();
+            
+            allWeeklySchedules.forEach(sched => {
+                const row = sched.rows.find(r => r.id === employee.id);
+                if (row) {
+                    const hoursWorked = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                    if (hoursWorked > 0) {
+                        totalHours += hoursWorked;
+                        workLocations.add(sched.storeId);
+                    }
+                }
+            });
+
             const regularHours = Math.min(totalHours, 40);
             const otHours = Math.max(0, totalHours - 40);
             
             let employeeSales = 0;
-            sales.forEach(sale => {
+            allWeeklySales.forEach(sale => {
                 if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
                 (sale.items || []).forEach(item => {
-                    if (item.salesRep === row.name) {
+                    if (item.salesRep === employee.name) {
                         employeeSales += Number(item.total || (item.price * item.quantity) || 0);
                     }
                 });
             });
 
+            const workLocationsDisplay = Array.from(workLocations).map(loc => 
+                loc === selectedStore ? `${loc} (Home)` : `${loc} (Guest)`
+            ).join(', ');
+
             const newRow = {
-                id: row.id,
-                code: existingPayroll.code || (employeeData ? employeeData.positionId : ''),
-                payrollName: row.name,
-                positionId: row.employeeId,
-                jobTitleDescription: row.jobTitle,
-                commissionPlan: existingPayroll.commissionPlan || (employeeData ? employeeData.commissionPlan || '2' : '2'),
-                rate: existingPayroll.rate !== undefined ? existingPayroll.rate : (employeeData ? employeeData.rate : 0),
-                base: existingPayroll.base !== undefined ? existingPayroll.base : (employeeData ? employeeData.baseSalary / 52 : 0),
+                id: employee.id,
+                payrollName: employee.name,
+                positionId: employee.positionId,
+                jobTitleDescription: employee.jobTitle,
+                workLocationsDisplay: workLocationsDisplay,
+                commissionPlan: existingPayroll.commissionPlan || (employee ? employee.commissionPlan || '2' : '2'),
+                rate: existingPayroll.rate !== undefined ? existingPayroll.rate : (employee ? employee.rate : 0),
+                base: existingPayroll.base !== undefined ? existingPayroll.base : (employee ? employee.baseSalary / 52 : 0),
                 regularHours,
                 otHours,
                 salesResults: employeeSales,
@@ -1957,7 +2061,50 @@ const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWe
             return newRow;
         });
         setPayrollData(initialData);
-    }, [schedule, payroll, sales, allEmployees]);
+
+        // Calculate Transfers In
+        const guestEmployeesOnSchedule = (schedule.rows || []).filter(row => {
+            const empData = allEmployees.find(emp => emp.id === row.id);
+            return empData && empData.associatedStore !== selectedStore;
+        });
+
+        const transfers = guestEmployeesOnSchedule.map(guestRow => {
+            const employeeData = allEmployees.find(emp => emp.id === guestRow.id);
+            const hoursWorked = Object.values(guestRow.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+            
+            let salesTotal = 0;
+            const salesInCurrentStore = allWeeklySales.filter(s => s.storeId === selectedStore);
+            salesInCurrentStore.forEach(sale => {
+                (sale.items || []).forEach(item => {
+                    if (item.salesRep === employeeData.name) {
+                        salesTotal += Number(item.total || (item.price * item.quantity) || 0);
+                    }
+                });
+            });
+
+            const rate = employeeData.rate || 0;
+            const earnings = rate * hoursWorked;
+            const commissionRate = parseFloat(employeeData.commissionPlan || '2') / 100;
+            const commission = salesTotal * commissionRate;
+            const totalWages = earnings + commission;
+
+            return {
+                id: employeeData.id,
+                name: employeeData.name,
+                positionId: employeeData.positionId,
+                homeStore: employeeData.associatedStore,
+                hoursWorked,
+                sales: salesTotal,
+                rate,
+                earnings,
+                commission,
+                totalWages
+            };
+        });
+        setTransfersInData(transfers);
+
+
+    }, [schedule, payroll, allWeeklySales, allWeeklySchedules, allEmployees, selectedStore]);
 
     const handlePayrollChange = (id, field, value) => {
         setPayrollData(currentData => currentData.map(row => {
@@ -2021,35 +2168,35 @@ const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWe
     };
     
     const payrollColumns = [
-        { header: 'Code', field: 'code', color: 'yellow' },
-        { header: 'Payroll Name', field: 'payrollName', color: 'yellow', readOnly: true },
-        { header: 'Position ID', field: 'positionId', color: 'yellow', readOnly: true },
-        { header: 'Job Title Description', field: 'jobTitleDescription', color: 'yellow', readOnly: true },
-        { header: 'COMMISSION PLAN', field: 'commissionPlan', color: 'yellow', type: 'text' },
-        { header: 'Rate', field: 'rate', color: 'white', type: 'number' },
-        { header: 'Base', field: 'base', color: 'white', type: 'number' },
-        { header: 'Commission $$$', field: 'commission', color: 'green', type: 'number', readOnly: true },
-        { header: 'Regular Hours', field: 'regularHours', color: 'white', type: 'number', readOnly: true },
-        { header: 'OT Hrs', field: 'otHours', color: 'white', type: 'number', readOnly: true },
-        { header: 'Sales Results', field: 'salesResults', color: 'white', type: 'number', readOnly: true },
-        { header: 'Bonus Pay $$$', field: 'bonusPay', color: 'white', type: 'number' },
-        { header: 'Sub-Total', field: 'subTotal', color: 'green', type: 'number' },
-        { header: 'Adjustments $$$', field: 'adjustments', color: 'green', type: 'number' },
-        { header: 'Weekly Gross Earnings', field: 'weeklyGrossEarnings', color: 'pink', type: 'number', readOnly: true },
-        { header: 'ADJ HRS', field: 'adjHrs', color: 'white', type: 'number' },
-        { header: 'Stat Holiday Hours', field: 'statHolidayHours', color: 'green', type: 'number' },
-        { header: 'Vacation Hours', field: 'vacationHours', color: 'white', type: 'number' },
-        { header: 'Adj. Commissions $$$', field: 'adjCommissions', color: 'white', type: 'number' },
-        { header: 'E-Commerce Commissions$$$', field: 'ecommerceCommissions', color: 'white', type: 'number' },
-        { header: 'Other $$$', field: 'other', color: 'white', type: 'number' },
-        { header: 'Retro Pay $$$', field: 'retroPay', color: 'white', type: 'number' },
-        { header: 'Pay in Lieu QC $$$', field: 'payInLieuQC', color: 'white', type: 'number' },
-        { header: 'Pay in Lieu $$$', field: 'payInLieu', color: 'white', type: 'number' },
-        { header: 'Final Termination Pay $$$', field: 'finalTerminationPay', color: 'white', type: 'number' },
-        { header: 'Comments', field: 'comments', color: 'white', type: 'text' },
-        { header: 'Stat Holiday $$$', field: 'statHoliday', color: 'white', type: 'number' },
-        { header: 'Personal Hours', field: 'personalHours', color: 'white', type: 'number' },
-        { header: 'Sick Hours', field: 'sickHours', color: 'white', type: 'number' },
+        { header: 'Payroll Name', field: 'payrollName', color: 'yellow', readOnly: true, width: 'w-48' },
+        { header: 'Position ID', field: 'positionId', color: 'yellow', readOnly: true, width: 'w-24' },
+        { header: 'Job Title Description', field: 'jobTitleDescription', color: 'yellow', readOnly: true, width: 'w-48' },
+        { header: 'Work Locations', field: 'workLocationsDisplay', color: 'blue', readOnly: true, width: 'w-48' },
+        { header: 'COMMISSION PLAN', field: 'commissionPlan', color: 'yellow', type: 'text', width: 'w-32' },
+        { header: 'Rate', field: 'rate', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Base', field: 'base', color: 'white', type: 'number', width: 'w-24' },
+        { header: 'Commission $$$', field: 'commission', color: 'green', type: 'number', readOnly: true, width: 'w-32' },
+        { header: 'Regular Hours', field: 'regularHours', color: 'white', type: 'number', readOnly: true, width: 'w-32' },
+        { header: 'OT Hrs', field: 'otHours', color: 'white', type: 'number', readOnly: true, width: 'w-24' },
+        { header: 'Sales Results', field: 'salesResults', color: 'white', type: 'number', readOnly: true, width: 'w-32' },
+        { header: 'Bonus Pay $$$', field: 'bonusPay', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Sub-Total', field: 'subTotal', color: 'green', type: 'number', width: 'w-32' },
+        { header: 'Adjustments $$$', field: 'adjustments', color: 'green', type: 'number', width: 'w-32' },
+        { header: 'Weekly Gross Earnings', field: 'weeklyGrossEarnings', color: 'pink', type: 'number', readOnly: true, width: 'w-40' },
+        { header: 'ADJ HRS', field: 'adjHrs', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Stat Holiday Hours', field: 'statHolidayHours', color: 'green', type: 'number', width: 'w-24' },
+        { header: 'Vacation Hours', field: 'vacationHours', color: 'white', type: 'number', width: 'w-24' },
+        { header: 'Adj. Commissions $$$', field: 'adjCommissions', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'E-Commerce Commissions$$$', field: 'ecommerceCommissions', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Other $$$', field: 'other', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Retro Pay $$$', field: 'retroPay', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Pay in Lieu QC $$$', field: 'payInLieuQC', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Pay in Lieu $$$', field: 'payInLieu', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Final Termination Pay $$$', field: 'finalTerminationPay', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Comments', field: 'comments', color: 'white', type: 'text', width: 'w-64' },
+        { header: 'Stat Holiday $$$', field: 'statHoliday', color: 'white', type: 'number', width: 'w-32' },
+        { header: 'Personal Hours', field: 'personalHours', color: 'white', type: 'number', width: 'w-24' },
+        { header: 'Sick Hours', field: 'sickHours', color: 'white', type: 'number', width: 'w-24' },
     ];
     
     const totals = useMemo(() => {
@@ -2081,7 +2228,7 @@ const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWe
                         <thead className="text-xs text-gray-300 uppercase">
                             <tr>
                                 {payrollColumns.map(col => (
-                                    <th key={col.field} scope="col" className={`px-2 py-3 sticky top-0 bg-gray-700 z-10 border border-gray-600 ${col.color === 'yellow' ? 'bg-yellow-900/50' : col.color === 'green' ? 'bg-green-900/50' : col.color === 'pink' ? 'bg-pink-900/50' : 'bg-gray-700'}`}>
+                                    <th key={col.field} scope="col" className={`px-2 py-3 sticky top-0 bg-gray-700 z-10 border border-gray-600 ${col.color === 'yellow' ? 'bg-yellow-900/50' : col.color === 'green' ? 'bg-green-900/50' : col.color === 'pink' ? 'bg-pink-900/50' : ''} ${col.width}`}>
                                         {t[col.field] || col.header}
                                     </th>
                                 ))}
@@ -2121,7 +2268,7 @@ const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWe
                             <tr>
                                  {payrollColumns.map(col => (
                                     <td key={col.field} className="px-2 py-2 text-right border border-gray-600">
-                                        {col.type === 'number' ? (col.field.includes('$$$') || col.field === 'rate' || col.field === 'base' || col.field === 'weeklyGrossEarnings' || col.field === 'salesResults' ? formatCurrency(totals[col.field]) : totals[col.field].toFixed(2)) : (col.field === 'code' ? t.totals : '')}
+                                        {col.type === 'number' ? (col.field.includes('$$$') || col.field === 'rate' || col.field === 'base' || col.field === 'weeklyGrossEarnings' || col.field === 'salesResults' ? formatCurrency(totals[col.field]) : totals[col.field].toFixed(2)) : (col.field === 'payrollName' ? t.totals : '')}
                                     </td>
                                 ))}
                             </tr>
@@ -2129,6 +2276,43 @@ const Payroll = ({ schedule, sales, allEmployees, payroll, setPayroll, currentWe
                     </table>
                 </div>
             </div>
+
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
+                <h2 className="text-2xl font-bold text-white mb-6">{t.transfersIn}</h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left text-gray-400">
+                        <thead className="text-xs text-gray-300 uppercase bg-gray-700">
+                            <tr>
+                                <th className="px-4 py-3">{t.employeeName}</th>
+                                <th className="px-4 py-3">{t.positionId}</th>
+                                <th className="px-4 py-3">{t.homeStore}</th>
+                                <th className="px-4 py-3">{t.hrs}</th>
+                                <th className="px-4 py-3">{t.netSales}</th>
+                                <th className="px-4 py-3">{t.rate}</th>
+                                <th className="px-4 py-3">{t.earnings}</th>
+                                <th className="px-4 py-3">{t.commission}</th>
+                                <th className="px-4 py-3">{t.totalWages}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {transfersInData.map(row => (
+                                <tr key={row.id} className="bg-gray-800 border-b border-gray-700">
+                                    <td className="px-4 py-2">{row.name}</td>
+                                    <td className="px-4 py-2">{row.positionId}</td>
+                                    <td className="px-4 py-2">{row.homeStore}</td>
+                                    <td className="px-4 py-2">{row.hoursWorked.toFixed(2)}</td>
+                                    <td className="px-4 py-2">{formatCurrency(row.sales)}</td>
+                                    <td className="px-4 py-2">{formatCurrency(row.rate)}</td>
+                                    <td className="px-4 py-2">{formatCurrency(row.earnings)}</td>
+                                    <td className="px-4 py-2">{formatCurrency(row.commission)}</td>
+                                    <td className="px-4 py-2 font-bold">{formatCurrency(row.totalWages)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
                 onClose={() => setIsConfirmModalOpen(false)}
@@ -2498,6 +2682,9 @@ function App() {
 
     const [isPayrollUnlocked, setIsPayrollUnlocked] = useState(false);
     const [passcodeChallenge, setPasscodeChallenge] = useState(null);
+    
+    const [allWeeklySchedules, setAllWeeklySchedules] = useState([]);
+    const [allWeeklySales, setAllWeeklySales] = useState([]);
 
     const t = translations[language];
 
@@ -2544,39 +2731,17 @@ function App() {
         if (!isAuthReady || !db || (view === 'dashboard' && !selectedStore)) return;
 
         if (view === 'dashboard') {
-            const commonQueryParts = [where("storeId", "==", selectedStore), where("week", "==", currentWeek), where("year", "==", currentYear)];
+            const commonQueryParts = [where("week", "==", currentWeek), where("year", "==", currentYear)];
             const basePath = `artifacts/${appId}/public/data`;
 
-            const salesQuery = query(collection(db, `${basePath}/sales`), ...commonQueryParts);
+            // Fetch data for the selected store
+            const salesQuery = query(collection(db, `${basePath}/sales`), where("storeId", "==", selectedStore), ...commonQueryParts);
             const unsubSales = onSnapshot(salesQuery, (snapshot) => setSales(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Error fetching sales:", err));
             
             const scheduleDocRef = doc(db, `${basePath}/schedules`, `${selectedStore}-${currentYear}-W${currentWeek}`);
             const unsubSchedule = onSnapshot(scheduleDocRef, (doc) => {
-                const storeEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
                 const loadedScheduleData = doc.exists() ? doc.data() : { rows: [] };
-                const loadedRowsMap = new Map((loadedScheduleData.rows || []).map(row => [row.id, row]));
-
-                const reconciledRows = storeEmployees.map(emp => {
-                    const existingRowData = loadedRowsMap.get(emp.id) || {};
-                    return {
-                        id: emp.id,
-                        name: emp.name,
-                        employeeId: emp.positionId,
-                        jobTitle: emp.jobTitle,
-                        objective: existingRowData.objective || 0,
-                        shifts: existingRowData.shifts || {},
-                        scheduledHours: existingRowData.scheduledHours || {},
-                        actualHours: existingRowData.actualHours || {},
-                        dailyObjectives: existingRowData.dailyObjectives || {},
-                    };
-                });
-
-                setSchedule({ 
-                    ...loadedScheduleData,
-                    rows: reconciledRows,
-                    week: currentWeek,
-                    year: currentYear
-                });
+                setSchedule(loadedScheduleData);
             }, err => console.error("Error fetching schedule:", err));
 
             const stcDocRef = doc(db, `${basePath}/stc`, `${selectedStore}-${currentYear}-W${currentWeek}`);
@@ -2594,6 +2759,13 @@ function App() {
                 setDailyPlanner(doc.exists() ? { id: doc.id, ...doc.data() } : { id: plannerDocId, notes: '', priorities: [], tasks: [] });
             }, err => console.error("Error fetching planner:", err));
 
+            // Fetch all weekly data for payroll calculations
+            const allSalesQuery = query(collection(db, `${basePath}/sales`), ...commonQueryParts);
+            const unsubAllSales = onSnapshot(allSalesQuery, (snapshot) => setAllWeeklySales(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Error fetching all sales:", err));
+            
+            const allSchedulesQuery = query(collection(db, `${basePath}/schedules`), ...commonQueryParts);
+            const unsubAllSchedules = onSnapshot(allSchedulesQuery, (snapshot) => setAllWeeklySchedules(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Error fetching all schedules:", err));
+
 
             return () => {
                 unsubSales();
@@ -2602,11 +2774,16 @@ function App() {
                 unsubGoals();
                 unsubPayroll();
                 unsubPlanner();
+                unsubAllSales();
+                unsubAllSchedules();
             };
         }
-    }, [isAuthReady, currentWeek, currentYear, selectedStore, view, allEmployees, currentDate]);
+    }, [isAuthReady, currentWeek, currentYear, selectedStore, view, currentDate]);
 
     const handleNavClick = (page) => {
+        if (page !== 'Payroll') {
+            setIsPayrollUnlocked(false);
+        }
         if (page === 'Payroll' && !isPayrollUnlocked) {
             setPasscodeChallenge({ type: 'payroll' });
         } else {
@@ -2628,7 +2805,7 @@ function App() {
     };
 
     const renderPage = () => {
-        const props = { sales, schedule, allEmployees, stcData, performanceGoals, payroll, setPayroll, currentWeek, currentYear, db, appId, selectedStore, t, setNotification, dailyPlanner, currentDate, language };
+        const props = { sales, schedule, allEmployees, stcData, performanceGoals, payroll, setPayroll, currentWeek, currentYear, db, appId, selectedStore, t, setNotification, dailyPlanner, currentDate, language, allWeeklySales, allWeeklySchedules };
         switch (currentPage) {
             case 'Dashboard': return <Dashboard {...props} />;
             case 'Performance Goals': return <PerformanceGoals {...props} />;
@@ -2672,7 +2849,7 @@ function App() {
 
     return (
         <div className="flex h-screen bg-gray-900 text-white font-sans">
-            <Sidebar currentPage={currentPage} onNavClick={handleNavClick} onChangeStore={() => {setSelectedStore(null); setView('storeSelector');}} t={t} />
+            <Sidebar currentPage={currentPage} onNavClick={handleNavClick} onChangeStore={() => {setSelectedStore(null); setView('storeSelector'); setIsPayrollUnlocked(false);}} t={t} />
             <main className="flex-1 flex flex-col overflow-hidden">
                 <header className="bg-gray-800 shadow-md p-4 flex justify-between items-center z-10">
                     <h1 className="text-2xl font-bold text-gray-100">{t[currentPage.toLowerCase().replace(/ /g, '')] || currentPage}</h1>
