@@ -3,8 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, where, writeBatch, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Calendar, Users, DollarSign, Clock, BarChart2, FileText, PlusCircle, Trash2, Save, TrendingUp, ChevronDown, ChevronUp, ClipboardList, ShoppingCart, Gift, UserCheck, Store, Shield, RefreshCw, LogOut, Target, X, Award, Percent, Hash, ChevronLeft, ChevronRight, UserCog, CheckCircle, UserPlus, Printer, Upload } from 'lucide-react';
-import Papa from 'papaparse';
+import { Calendar, Users, DollarSign, Clock, BarChart2, FileText, PlusCircle, Trash2, Save, TrendingUp, ChevronDown, ChevronUp, ClipboardList, ShoppingCart, Gift, UserCheck, Store, Shield, RefreshCw, LogOut, Target, X, Award, Percent, Hash, ChevronLeft, ChevronRight, UserCog, CheckCircle, UserPlus, Printer } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -196,11 +195,6 @@ const translations = {
         printSchedule: 'Print Schedule',
         payrollPercentage: 'Payroll Percentage',
         targetVsActual: 'Target vs. Actual',
-        importFromCsv: 'Import from CSV',
-        importPreview: 'Import Preview',
-        confirmImport: 'Confirm Import',
-        importSuccess: 'Successfully imported employee data!',
-        importError: 'Error importing CSV. Please check the file format.',
     },
     fr: {
         dashboard: 'Tableau de Bord',
@@ -368,11 +362,6 @@ const translations = {
         printSchedule: 'Imprimer l\'Horaire',
         payrollPercentage: 'Pourcentage de la Paie',
         targetVsActual: 'Objectif vs Réel',
-        importFromCsv: 'Importer de CSV',
-        importPreview: 'Aperçu de l\'importation',
-        confirmImport: 'Confirmer l\'importation',
-        importSuccess: 'Données des employés importées avec succès!',
-        importError: 'Erreur lors de l\'importation du CSV. Veuillez vérifier le format du fichier.',
     }
 };
 
@@ -579,8 +568,6 @@ const AdminPage = ({ onExit, t, db, appId, setNotification }) => {
     });
     const [saveStatus, setSaveStatus] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [importData, setImportData] = useState(null);
-    const fileInputRef = React.createRef();
 
     useEffect(() => {
         if (!db) return;
@@ -675,61 +662,6 @@ const AdminPage = ({ onExit, t, db, appId, setNotification }) => {
          }
     };
 
-    const handleFileImport = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    setImportData(results.data);
-                },
-                error: (error) => {
-                    setNotification({ message: t.importError, type: 'error' });
-                    console.error("CSV parsing error:", error);
-                }
-            });
-        }
-    };
-
-    const handleConfirmImport = async () => {
-        if (!importData || !db) return;
-        const batch = writeBatch(db);
-        const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
-        const existingPositionIds = new Map(employees.map(emp => [emp.positionId, emp.id]));
-
-        importData.forEach(newEmp => {
-            const existingId = existingPositionIds.get(newEmp.positionId);
-            const data = {
-                name: newEmp.name,
-                positionId: newEmp.positionId,
-                jobTitle: newEmp.jobTitle,
-                rate: Number(newEmp.rate) || 0,
-                baseSalary: Number(newEmp.baseSalary) || 0,
-                associatedStore: newEmp.associatedStore,
-            };
-
-            if (existingId) { // Update existing
-                const docRef = doc(employeesCollectionRef, existingId);
-                batch.update(docRef, data);
-            } else { // Create new
-                const docRef = doc(employeesCollectionRef);
-                batch.set(docRef, data);
-            }
-        });
-
-        try {
-            await batch.commit();
-            setNotification({ message: t.importSuccess, type: 'success' });
-        } catch (error) {
-            setNotification({ message: t.importError, type: 'error' });
-            console.error("Error importing data:", error);
-        } finally {
-            setImportData(null);
-            if(fileInputRef.current) fileInputRef.current.value = "";
-        }
-    };
-
     return (
         <div className="bg-gray-900 text-white min-h-screen p-8 font-sans">
             <header className="flex justify-between items-center mb-8">
@@ -744,12 +676,7 @@ const AdminPage = ({ onExit, t, db, appId, setNotification }) => {
             </header>
 
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="flex justify-end mb-4 space-x-2">
-                     <input type="file" accept=".csv" onChange={handleFileImport} className="hidden" ref={fileInputRef} />
-                     <button onClick={() => fileInputRef.current.click()} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
-                        <Upload size={18} className="mr-2"/>
-                        {t.importFromCsv}
-                     </button>
+                <div className="flex justify-end mb-4">
                      <SaveButton onClick={handleSaveClick} saveState={saveStatus} text={t.saveChanges} />
                 </div>
                 <div className="overflow-x-auto">
@@ -811,32 +738,6 @@ const AdminPage = ({ onExit, t, db, appId, setNotification }) => {
                     </form>
                 </div>
             </div>
-            {importData && (
-                <ConfirmationModal
-                    isOpen={!!importData}
-                    onClose={() => setImportData(null)}
-                    onConfirm={handleConfirmImport}
-                    title={t.importPreview}
-                    t={t}
-                >
-                    <div className="text-left max-h-96 overflow-y-auto">
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr>
-                                    {Object.keys(importData[0] || {}).map(key => <th key={key} className="p-1 border-b border-gray-600">{key}</th>)}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {importData.map((row, i) => (
-                                    <tr key={i}>
-                                        {Object.values(row).map((val, j) => <td key={j} className="p-1">{val}</td>)}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </ConfirmationModal>
-            )}
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
                 onClose={() => setIsConfirmModalOpen(false)}
@@ -979,18 +880,18 @@ const Notification = ({ message, type, onClose }) => {
 
 // --- Page Components ---
 
-const Dashboard = ({ sales, allEmployees, allWeeklySchedules, selectedStore, performanceGoals, stcData, t }) => {
+const Dashboard = ({ sales, allEmployees, allWeeklySchedules, allWeeklySales, selectedStore, performanceGoals, stcData, t }) => {
     const { netSales, avgTransactionValue, unitsPerTransaction, conversionRate, leaderboardData, categorySalesData, payrollPercentage } = useMemo(() => {
-        let totalNetSales = 0;
+        const currentStoreSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD);
+        let totalNetSales = currentStoreSales.reduce((sum, s) => sum + s.total, 0);
+
         const employeeSalesMap = new Map();
         const categoryTotals = {};
 
-        sales.forEach(sale => {
-            if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
-            totalNetSales += sale.total;
+        currentStoreSales.forEach(sale => {
             (sale.items || []).forEach(item => {
                 const rep = item.salesRep;
-                const itemValue = Number(item.total || (item.price * item.quantity) || 0);
+                const itemValue = Number(item.total || 0);
                 if(rep) {
                     employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
                 }
@@ -1001,7 +902,7 @@ const Dashboard = ({ sales, allEmployees, allWeeklySchedules, selectedStore, per
             });
         });
         
-        const merchandiseSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
+        const merchandiseSales = currentStoreSales.filter(s => s.type !== TRANSACTION_TYPES.RETURN);
         const totalTransactions = merchandiseSales.length;
         const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
         
@@ -1039,11 +940,11 @@ const Dashboard = ({ sales, allEmployees, allWeeklySchedules, selectedStore, per
             const otHours = Math.max(0, totalHours - 40);
 
             let employeeSales = 0;
-            sales.forEach(sale => { // Using local store sales for dashboard context
+            allWeeklySales.forEach(sale => {
                 if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
                 (sale.items || []).forEach(item => {
                     if (item.salesRep === employee.name) {
-                        employeeSales += Number(item.total || (item.price * item.quantity) || 0);
+                        employeeSales += Number(item.total || 0);
                     }
                 });
             });
@@ -1068,7 +969,7 @@ const Dashboard = ({ sales, allEmployees, allWeeklySchedules, selectedStore, per
             categorySalesData: categorySales,
             payrollPercentage: percentage,
         };
-    }, [sales, stcData, allEmployees, allWeeklySchedules, selectedStore]);
+    }, [sales, stcData, allEmployees, allWeeklySchedules, allWeeklySales, selectedStore]);
     
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
     const dailyTarget = performanceGoals.daily?.[todayString.toLowerCase()] || 0;
@@ -2182,17 +2083,18 @@ const Payroll = ({ schedule, allWeeklySales, allWeeklySchedules, allEmployees, p
     const { totalWeeklySalary, totalWeeklySales, payrollPercentage, salesDifference } = useMemo(() => {
         const totalSalary = payrollData.reduce((sum, row) => sum + (row.weeklyGrossEarnings || 0), 0);
         
-        const currentStoreSales = allWeeklySales
-            .filter(sale => sale.storeId === selectedStore && sale.type !== TRANSACTION_TYPES.GIFT_CARD && sale.type !== TRANSACTION_TYPES.RETURN)
+        const currentStoreSalesData = allWeeklySales.filter(sale => sale.storeId === selectedStore);
+        const currentStoreNetSales = currentStoreSalesData
+            .filter(sale => sale.type !== TRANSACTION_TYPES.GIFT_CARD)
             .reduce((sum, sale) => sum + sale.total, 0);
         
-        const percentage = currentStoreSales > 0 ? (totalSalary / currentStoreSales) * 100 : 0;
+        const percentage = currentStoreNetSales > 0 ? (totalSalary / currentStoreNetSales) * 100 : 0;
         const target = performanceGoals?.weeklySalesTarget || 0;
-        const difference = currentStoreSales - target;
+        const difference = currentStoreNetSales - target;
 
         return {
             totalWeeklySalary: totalSalary,
-            totalWeeklySales: currentStoreSales,
+            totalWeeklySales: currentStoreNetSales,
             payrollPercentage: percentage,
             salesDifference: difference,
         };
@@ -2229,7 +2131,7 @@ const Payroll = ({ schedule, allWeeklySales, allWeeklySchedules, allEmployees, p
                 if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
                 (sale.items || []).forEach(item => {
                     if (item.salesRep === employee.name) {
-                        employeeSales += Number(item.total || (item.price * item.quantity) || 0);
+                        employeeSales += Number(item.total || 0);
                     }
                 });
             });
@@ -2298,7 +2200,7 @@ const Payroll = ({ schedule, allWeeklySales, allWeeklySchedules, allEmployees, p
             salesInCurrentStore.forEach(sale => {
                 (sale.items || []).forEach(item => {
                     if (item.salesRep === employeeData.name) {
-                        salesTotal += Number(item.total || (item.price * item.quantity) || 0);
+                        salesTotal += Number(item.total || 0);
                     }
                 });
             });
@@ -2390,7 +2292,7 @@ const Payroll = ({ schedule, allWeeklySales, allWeeklySchedules, allEmployees, p
     
     const payrollColumns = [
         { header: 'Payroll Name', field: 'payrollName', color: 'yellow', readOnly: true, width: 'w-48' },
-        { header: 'Position ID', field: 'positionId', color: 'yellow', readOnly: true, width: 'w-32' },
+        { header: 'Position ID', field: 'positionId', color: 'yellow', readOnly: true, width: 'w-40' },
         { header: 'Job Title Description', field: 'jobTitleDescription', color: 'yellow', readOnly: true, width: 'w-48' },
         { header: 'Work Locations', field: 'workLocationsDisplay', color: 'blue', readOnly: true, width: 'w-48' },
         { header: 'COMMISSION PLAN', field: 'commissionPlan', color: 'yellow', type: 'text', width: 'w-32' },
@@ -2642,7 +2544,7 @@ const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, curre
                     if (!categoryTotals[item.category]) {
                         categoryTotals[item.category] = 0;
                     }
-                    categoryTotals[item.category] += Number(item.total || (item.price * item.quantity) || 0);
+                    categoryTotals[item.category] += Number(item.total || 0);
                 });
             }
         });
@@ -2684,7 +2586,7 @@ const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, curre
             
             (sale.items || []).forEach(item => {
                 const rep = item.salesRep;
-                const itemValue = Number(item.total || (item.price * item.quantity) || 0);
+                const itemValue = Number(item.total || 0);
 
                 if (employeeAnalysis.has(rep)) {
                     const emp = employeeAnalysis.get(rep);
@@ -2889,6 +2791,7 @@ const ReportStatCard = ({ title, value }) => (
     </div>
 );
 
+// --- Main App Component ---
 function App() {
     const [view, setView] = useState('storeSelector'); // 'storeSelector', 'admin', 'dashboard'
     const [currentPage, setCurrentPage] = useState('Dashboard');
@@ -2925,8 +2828,6 @@ function App() {
                 setIsAuthReady(true);
             } else {
                 try {
-                    // When running in a custom environment, we should rely on anonymous sign-in
-                    // as the __initial_auth_token is specific to the original environment.
                     await signInAnonymously(auth);
                 } catch (error) {
                     console.error("Authentication error:", error);
