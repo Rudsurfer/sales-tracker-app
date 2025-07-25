@@ -23,7 +23,7 @@ import { STC } from './pages/STC';
 import { Payroll } from './pages/Payroll';
 import { Reports } from './pages/Reports';
 
-import { Store } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 
 let app, auth, db;
 try {
@@ -195,7 +195,7 @@ export default function App() {
                     <h1 className="text-2xl font-bold text-gray-100">{t[currentPage.toLowerCase().replace(/ /g, '')] || currentPage}</h1>
                     <div className="flex items-center space-x-4">
                         <div className="flex items-center space-x-2 bg-gray-700 px-3 py-1 rounded-lg">
-                           <Store size={16} className="text-gray-400"/>
+                           <Building2 size={16} className="text-gray-400"/>
                            <span className="font-bold text-white">{t.store}: {selectedStore}</span>
                         </div>
                         <WeekNavigator {...{currentDate, setCurrentDate, currentWeek, language}} />
