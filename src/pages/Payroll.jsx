@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { formatCurrency } from '../utils/helpers';
+import { TRANSACTION_TYPES } from '../constants';
 
 export const Payroll = ({ allSchedules, allSales, allEmployees, payroll, currentWeek, currentYear, db, appId, selectedStore, setNotification, t, performanceGoals }) => {
     const [payrollData, setPayrollData] = useState([]);
@@ -215,7 +216,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, payroll, current
 
     return (
         <>
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-white">{t.payroll}</h2>
                     <div className="flex items-center gap-4">
@@ -232,17 +233,84 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, payroll, current
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-400 border-collapse">
-                        {/* Payroll Table Header */}
+                        <thead className="text-xs text-gray-300 uppercase">
+                           <tr>
+                                {payrollColumns.map(col => (
+                                    <th key={col.field} scope="col" className={`px-2 py-3 sticky top-0 bg-gray-700 z-10 border border-gray-600`}>
+                                        {t[col.field] || col.header}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
                         <tbody>
-                            {/* Payroll Table Rows */}
+                            {payrollData.map(row => (
+                                <tr key={row.id} className="bg-gray-800 border-b border-gray-700">
+                                    {payrollColumns.map(col => (
+                                        <td key={col.field} className={`px-1 py-1 border border-gray-700`}>
+                                            {col.readOnly ? (
+                                                <span className="px-2 py-1 block whitespace-nowrap">{col.field === 'positionId' ? `FOLT000${row[col.field]}` : (col.field.includes('$$$') || ['rate', 'base', 'weeklyGrossEarnings', 'salesResults', 'commission'].includes(col.field)) ? formatCurrency(row[col.field]) : row[col.field]}</span>
+                                            ) : (
+                                                <input
+                                                    type={col.type || 'text'}
+                                                    value={row[col.field] === 0 ? '' : row[col.field]}
+                                                    onChange={(e) => handlePayrollChange(row.id, col.field, e.target.value)}
+                                                    className="w-full bg-transparent focus:bg-gray-900 outline-none rounded-md px-2 py-1"
+                                                />
+                                            )}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
                         </tbody>
                          <tfoot className="text-white font-bold bg-gray-700">
-                            {/* Payroll Table Footer */}
+                            <tr>
+                                 {payrollColumns.map(col => (
+                                    <td key={col.field} className="px-2 py-2 text-right border border-gray-600 whitespace-nowrap">
+                                        {col.type === 'number' ? (['rate', 'base', 'weeklyGrossEarnings', 'salesResults', 'commission'].includes(col.field) || col.field.includes('$$$') ? formatCurrency(totals[col.field]) : totals[col.field].toFixed(2)) : (col.field === 'payrollName' ? t.totals : '')}
+                                    </td>
+                                ))}
+                            </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
-            {/* Transfers In Section */}
+            
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h3 className="text-xl font-bold text-white mb-4">{t.transfersIn}</h3>
+                <div className="overflow-x-auto">
+                     <table className="w-full text-sm text-left text-gray-400">
+                        <thead className="text-xs text-gray-300 uppercase bg-gray-700">
+                            <tr>
+                                <th className="px-4 py-3">{t.employeeName}</th>
+                                <th className="px-4 py-3">{t.positionId}</th>
+                                <th className="px-4 py-3">{t.homeStore}</th>
+                                <th className="px-4 py-3 text-right">{t.hrs}</th>
+                                <th className="px-4 py-3 text-right">{t.sales}</th>
+                                <th className="px-4 py-3 text-right">{t.rate}</th>
+                                <th className="px-4 py-3 text-right">{t.earnings}</th>
+                                <th className="px-4 py-3 text-right">{t.commission}</th>
+                                <th className="px-4 py-3 text-right">{t.totalWages}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {transfersInData.map(guest => (
+                                <tr key={guest.id} className="bg-gray-800 border-b border-gray-700">
+                                    <td className="px-4 py-2">{guest.name}</td>
+                                    <td className="px-4 py-2">FOLT000{guest.positionId}</td>
+                                    <td className="px-4 py-2">{guest.homeStore}</td>
+                                    <td className="px-4 py-2 text-right">{guest.hoursWorked.toFixed(2)}</td>
+                                    <td className="px-4 py-2 text-right">{formatCurrency(guest.sales)}</td>
+                                    <td className="px-4 py-2 text-right">{formatCurrency(guest.rate)}</td>
+                                    <td className="px-4 py-2 text-right">{formatCurrency(guest.earnings)}</td>
+                                    <td className="px-4 py-2 text-right">{formatCurrency(guest.commission)}</td>
+                                    <td className="px-4 py-2 text-right font-bold">{formatCurrency(guest.totalWages)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
                 onClose={() => setIsConfirmModalOpen(false)}
