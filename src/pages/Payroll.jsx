@@ -10,6 +10,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     
     const homeStoreEmployees = useMemo(() => allEmployees.filter(e => e.associatedStore === selectedStore), [allEmployees, selectedStore]);
+    
     const transfersIn = useMemo(() => {
         const guestAssociateIds = new Set();
         const currentSchedule = allSchedules.find(s => s.storeId === selectedStore);
@@ -34,10 +35,11 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                 allSchedules.forEach(sched => {
                     const row = sched.rows.find(r => r.id === emp.id);
                     if (row) {
-                        totalHours += Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-                        if (totalHours > 0) {
+                        const hoursInSched = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                        if (hoursInSched > 0) {
                              workLocations.add(`${sched.storeId} (${sched.storeId === emp.associatedStore ? 'Home' : 'Guest'})`);
                         }
+                        totalHours += hoursInSched;
                     }
                 });
 
@@ -53,8 +55,9 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                 const regularHours = Math.min(totalHours, 40);
                 const otHours = Math.max(0, totalHours - 40);
                 const commission = totalSales * (parseFloat(emp.commissionPlan || '2') / 100);
-                const base = emp.baseSalary / 52;
-                const gross = (emp.rate * regularHours) + (emp.rate * 1.5 * otHours) + base + commission;
+                const base = emp.baseSalary ? emp.baseSalary / 52 : 0;
+                const rate = emp.rate || 0;
+                const gross = (rate * regularHours) + (rate * 1.5 * otHours) + base + commission;
 
                 return {
                     id: emp.id,
@@ -63,21 +66,69 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                     jobTitleDescription: emp.jobTitle,
                     workLocations: Array.from(workLocations).join(', '),
                     commissionPlan: emp.commissionPlan || '2',
-                    rate: emp.rate || 0,
-                    base: base || 0,
+                    rate: rate,
+                    base: base,
                     regularHours,
                     otHours,
                     salesResults: totalSales,
                     commission,
-                    weeklyGrossEarnings: gross
+                    weeklyGrossEarnings: gross,
+                    bonusPay: 0,
+                    adjHrs: 0,
+                    vacationHours: 0,
+                    adjCommissions: 0,
+                    ecommerceCommissions: 0,
+                    other: 0,
+                    retroPay: 0,
+                    payInLieuQC: 0,
+                    payInLieu: 0,
+                    finalTerminationPay: 0,
+                    comments: '',
+                    statHoliday: 0,
+                    personalHours: 0,
+                    sickHours: 0,
+                    subTotal: 0,
+                    adjustments: 0,
+                    statHolidayHours: 0,
                 };
             });
             setPayrollData(data);
         };
         calculatePayroll();
     }, [homeStoreEmployees, allSchedules, allSales]);
+
+    const handlePayrollChange = (id, field, value) => {
+        setPayrollData(currentData => currentData.map(row => {
+            if (row.id === id) {
+                const newRow = { ...row, [field]: value };
+                
+                const commissionRate = parseFloat(newRow.commissionPlan) / 100;
+                newRow.commission = !isNaN(commissionRate) ? newRow.salesResults * commissionRate : 0;
+                
+                const { rate, regularHours, otHours, bonusPay, adjHrs, vacationHours, personalHours, sickHours, statHolidayHours, base, commission, adjCommissions, ecommerceCommissions, other, retroPay, payInLieuQC, payInLieu, finalTerminationPay, statHoliday, subTotal, adjustments } = newRow;
+                
+                const gross = (Number(rate) * (Number(regularHours) + Number(adjHrs) + Number(vacationHours) + Number(personalHours) + Number(sickHours) + Number(statHolidayHours))) +
+                              (Number(rate) * 1.5 * Number(otHours)) +
+                              Number(base) +
+                              Number(commission) +
+                              Number(bonusPay) + 
+                              Number(adjCommissions) + 
+                              Number(ecommerceCommissions) + 
+                              Number(other) + 
+                              Number(retroPay) + 
+                              Number(payInLieuQC) + 
+                              Number(payInLieu) + 
+                              Number(finalTerminationPay) + 
+                              Number(statHoliday) + 
+                              Number(subTotal) + 
+                              Number(adjustments);
+                return { ...newRow, weeklyGrossEarnings: gross };
+            }
+            return row;
+        }));
+    };
     
-    const { payrollPercentage, targetVsActual } = useMemo(() => {
+    const { payrollPercentage, targetVsActual, payrollPercentageColor } = useMemo(() => {
         const totalPayroll = payrollData.reduce((sum, emp) => sum + emp.weeklyGrossEarnings, 0);
         const totalSales = allSales.filter(s => s.storeId === selectedStore && s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
         const weeklyTarget = performanceGoals.weeklySalesTarget || 0;
@@ -85,7 +136,14 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
         const percentage = totalSales > 0 ? (totalPayroll / totalSales) * 100 : 0;
         const difference = totalSales - weeklyTarget;
         
-        return { payrollPercentage: percentage, targetVsActual: difference };
+        let colorClass = 'text-green-400';
+        if (percentage > 16 && percentage < 20) {
+            colorClass = 'text-yellow-400';
+        } else if (percentage >= 20) {
+            colorClass = 'text-red-400';
+        }
+        
+        return { payrollPercentage: percentage, targetVsActual: difference, payrollPercentageColor: colorClass };
     }, [payrollData, allSales, selectedStore, performanceGoals]);
 
     const handleSaveClick = () => setIsConfirmModalOpen(true);
@@ -139,7 +197,24 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
         { header: 'Regular Hours', field: 'regularHours', color: 'white', type: 'number', readOnly: true, width: 'min-w-[120px]' },
         { header: 'OT Hrs', field: 'otHours', color: 'white', type: 'number', readOnly: true, width: 'min-w-[100px]' },
         { header: 'Sales Results', field: 'salesResults', color: 'white', type: 'number', readOnly: true, width: 'min-w-[150px]' },
+        { header: 'Bonus Pay $$$', field: 'bonusPay', color: 'white', type: 'number' },
+        { header: 'Sub-Total', field: 'subTotal', color: 'green', type: 'number' },
+        { header: 'Adjustments $$$', field: 'adjustments', color: 'green', type: 'number' },
         { header: 'Weekly Gross Earnings', field: 'weeklyGrossEarnings', color: 'pink', type: 'number', readOnly: true, width: 'min-w-[200px]' },
+        { header: 'ADJ HRS', field: 'adjHrs', color: 'white', type: 'number' },
+        { header: 'Stat Holiday Hours', field: 'statHolidayHours', color: 'green', type: 'number' },
+        { header: 'Vacation Hours', field: 'vacationHours', color: 'white', type: 'number' },
+        { header: 'Adj. Commissions $$$', field: 'adjCommissions', color: 'white', type: 'number' },
+        { header: 'E-Commerce Commissions$$$', field: 'ecommerceCommissions', color: 'white', type: 'number' },
+        { header: 'Other $$$', field: 'other', color: 'white', type: 'number' },
+        { header: 'Retro Pay $$$', field: 'retroPay', color: 'white', type: 'number' },
+        { header: 'Pay in Lieu QC $$$', field: 'payInLieuQC', color: 'white', type: 'number' },
+        { header: 'Pay in Lieu $$$', field: 'payInLieu', color: 'white', type: 'number' },
+        { header: 'Final Termination Pay $$$', field: 'finalTerminationPay', color: 'white', type: 'number' },
+        { header: 'Comments', field: 'comments', color: 'white', type: 'text', width: 'min-w-[200px]' },
+        { header: 'Stat Holiday $$$', field: 'statHoliday', color: 'white', type: 'number' },
+        { header: 'Personal Hours', field: 'personalHours', color: 'white', type: 'number' },
+        { header: 'Sick Hours', field: 'sickHours', color: 'white', type: 'number' },
     ];
 
     return (
@@ -151,7 +226,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                     <div className="flex items-center gap-4">
                          <div className="text-right">
                             <p className="text-sm text-gray-400">{t.payrollPercentage}</p>
-                            <p className="text-2xl font-bold">{payrollPercentage.toFixed(2)}%</p>
+                            <p className={`text-2xl font-bold ${payrollPercentageColor}`}>{payrollPercentage.toFixed(2)}%</p>
                         </div>
                         <div className="text-right">
                             <p className="text-sm text-gray-400">{t.targetVsActual}</p>
@@ -161,7 +236,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-400 border-collapse">
+                    <table className="w-full text-sm text-left text-gray-400 border-collapse table-fixed">
                         <thead className="text-xs text-gray-300 uppercase">
                             <tr>
                                 {payrollColumns.map(col => (
@@ -177,12 +252,12 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                                     {payrollColumns.map(col => (
                                         <td key={col.field} className={`px-1 py-1 border border-gray-700 ${col.color === 'yellow' ? 'bg-yellow-800/20' : col.color === 'green' ? 'bg-green-800/20' : col.color === 'pink' ? 'bg-pink-800/20' : ''}`}>
                                             {col.readOnly ? (
-                                                <span className="px-2 py-1 block">{col.field.includes('$$$') || ['rate', 'base', 'weeklyGrossEarnings', 'salesResults', 'commission'].includes(col.field) ? formatCurrency(row[col.field]) : row[col.field]}</span>
+                                                <span className="px-2 py-1 block truncate">{col.field.includes('$$$') || ['rate', 'base', 'weeklyGrossEarnings', 'salesResults', 'commission'].includes(col.field) ? formatCurrency(row[col.field]) : row[col.field]}</span>
                                             ) : (
                                                 <input
                                                     type={col.type || 'text'}
                                                     value={row[col.field]}
-                                                    readOnly // Make all fields read-only for now
+                                                    onChange={(e) => handlePayrollChange(row.id, col.field, e.target.value)}
                                                     className="w-full bg-transparent outline-none rounded-md px-2 py-1"
                                                 />
                                             )}
