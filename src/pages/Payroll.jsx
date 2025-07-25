@@ -27,6 +27,8 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
 
     useEffect(() => {
         const calculatePayroll = () => {
+            if(!homeStoreEmployees.length) return;
+
             const data = homeStoreEmployees.map(emp => {
                 let totalHours = 0;
                 let totalSales = 0;
@@ -59,20 +61,8 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                 const rate = emp.rate || 0;
                 const gross = (rate * regularHours) + (rate * 1.5 * otHours) + base + commission;
 
-                return {
-                    id: emp.id,
-                    payrollName: emp.name,
-                    positionId: `FOLT000${emp.positionId}`,
-                    jobTitleDescription: emp.jobTitle,
-                    workLocations: Array.from(workLocations).join(', '),
-                    commissionPlan: emp.commissionPlan || '2',
-                    rate: rate,
-                    base: base,
-                    regularHours,
-                    otHours,
-                    salesResults: totalSales,
-                    commission,
-                    weeklyGrossEarnings: gross,
+                // For now, these are placeholders for manual entry
+                const initialPayrollEntry = {
                     bonusPay: 0,
                     adjHrs: 0,
                     vacationHours: 0,
@@ -90,6 +80,23 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                     subTotal: 0,
                     adjustments: 0,
                     statHolidayHours: 0,
+                };
+                
+                return {
+                    id: emp.id,
+                    payrollName: emp.name,
+                    positionId: `FOLT000${emp.positionId}`,
+                    jobTitleDescription: emp.jobTitle,
+                    workLocations: Array.from(workLocations).join(', '),
+                    commissionPlan: emp.commissionPlan || '2',
+                    rate: rate,
+                    base: base,
+                    regularHours,
+                    otHours,
+                    salesResults: totalSales,
+                    commission,
+                    weeklyGrossEarnings: gross,
+                    ...initialPayrollEntry
                 };
             });
             setPayrollData(data);
@@ -217,6 +224,26 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
         { header: 'Sick Hours', field: 'sickHours', color: 'white', type: 'number' },
     ];
 
+    const mainTableTotals = useMemo(() => {
+        const totals = {};
+        payrollColumns.forEach(col => {
+            if (col.type === 'number') {
+                totals[col.field] = payrollData.reduce((sum, row) => sum + (Number(row[col.field]) || 0), 0);
+            }
+        });
+        return totals;
+    }, [payrollData, payrollColumns]);
+
+    const transfersInTotals = useMemo(() => {
+        return {
+            hoursWorked: transfersInData.reduce((sum, row) => sum + row.hoursWorked, 0),
+            sales: transfersInData.reduce((sum, row) => sum + row.sales, 0),
+            earnings: transfersInData.reduce((sum, row) => sum + row.earnings, 0),
+            commission: transfersInData.reduce((sum, row) => sum + row.commission, 0),
+            totalWages: transfersInData.reduce((sum, row) => sum + row.totalWages, 0),
+        }
+    }, [transfersInData]);
+
     return (
         <>
         <div className="space-y-6">
@@ -236,7 +263,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-400 border-collapse table-fixed">
+                    <table className="w-full text-sm text-left text-gray-400 border-collapse">
                         <thead className="text-xs text-gray-300 uppercase">
                             <tr>
                                 {payrollColumns.map(col => (
@@ -266,6 +293,19 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                                 </tr>
                             ))}
                         </tbody>
+                        <tfoot className="text-white font-bold bg-gray-700">
+                            <tr>
+                                 {payrollColumns.map(col => (
+                                    <td key={col.field} className="px-2 py-2 text-right border border-gray-600">
+                                        {col.type === 'number' ? (
+                                            ['rate', 'base', 'weeklyGrossEarnings', 'salesResults', 'commission'].includes(col.field) || col.header.includes('$$$') ? 
+                                            formatCurrency(mainTableTotals[col.field]) : 
+                                            mainTableTotals[col.field]?.toFixed(2)
+                                        ) : (col.field === 'payrollName' ? t.totals : '')}
+                                    </td>
+                                ))}
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -302,6 +342,17 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                                     </tr>
                                 ))}
                             </tbody>
+                            <tfoot className="text-white font-bold bg-gray-700">
+                                <tr>
+                                    <td colSpan="3" className="px-4 py-2 font-bold">{t.totals}</td>
+                                    <td className="px-4 py-2 text-right font-bold">{transfersInTotals.hoursWorked.toFixed(2)}</td>
+                                    <td className="px-4 py-2 text-right font-bold">{formatCurrency(transfersInTotals.sales)}</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-4 py-2 text-right font-bold">{formatCurrency(transfersInTotals.earnings)}</td>
+                                    <td className="px-4 py-2 text-right font-bold">{formatCurrency(transfersInTotals.commission)}</td>
+                                    <td className="px-4 py-2 text-right font-bold">{formatCurrency(transfersInTotals.totalWages)}</td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
