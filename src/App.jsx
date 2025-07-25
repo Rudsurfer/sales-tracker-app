@@ -126,7 +126,12 @@ export default function App() {
                 if (empData && empData.associatedStore === selectedStore) {
                     return { ...row, name: empData.name, jobTitle: empData.jobTitle };
                 }
-                if (empData && empData.associatedStore !== selectedStore) { return null; }
+                // Allow guest employees to remain if they are in the schedule
+                if (empData && empData.associatedStore !== selectedStore) {
+                    return row;
+                }
+                // If employee no longer exists, filter them out
+                if (!empData) return null;
                 return row;
             }).filter(Boolean);
             setSchedule({ ...currentStoreSchedule, rows: finalRows });
@@ -137,8 +142,14 @@ export default function App() {
     }, [allSchedules, allEmployees, selectedStore, currentWeek, currentYear]);
 
     const handleNavClick = (page) => {
-        if (page === 'Payroll' && !isPayrollUnlocked) setPasscodeChallenge({ type: 'payroll' });
-        else setCurrentPage(page);
+        if (page === 'Payroll' && !isPayrollUnlocked) {
+             setPasscodeChallenge({ type: 'payroll' });
+        } else {
+            setCurrentPage(page);
+        }
+        if (page !== 'Payroll') {
+            setIsPayrollUnlocked(false);
+        }
     };
 
     const handlePasscodeSuccess = () => {
@@ -189,7 +200,7 @@ export default function App() {
 
     return (
         <div className="flex h-screen bg-gray-900 text-white font-sans">
-            <Sidebar currentPage={currentPage} onNavClick={(page) => {setCurrentPage(page); if(page !== 'Payroll') setIsPayrollUnlocked(false);}} onChangeStore={handleChangeStore} t={t} />
+            <Sidebar currentPage={currentPage} onNavClick={handleNavClick} onChangeStore={handleChangeStore} t={t} />
             <main className="flex-1 flex flex-col overflow-hidden">
                 <header className="bg-gray-800 shadow-md p-4 flex justify-between items-center z-10">
                     <h1 className="text-2xl font-bold text-gray-100">{t[currentPage.toLowerCase().replace(/ /g, '')] || currentPage}</h1>

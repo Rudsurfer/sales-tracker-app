@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, PieChart, Pie, Cell } from 'recharts';
+import { getDocs, getDoc, collection, query, where, doc } from 'firebase/firestore';
+import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
 import { RefreshCw } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
 import { TRANSACTION_TYPES, SALE_CATEGORIES, COLORS } from '../constants';
@@ -19,20 +19,21 @@ const TrendChart = ({ data, dataKey, title, color, formatter }) => (
             <LineChart data={data} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#4A5568" />
                 <XAxis dataKey="name" stroke="#A0AEC0" />
-                <YAxis stroke="#A0AEC0" tickFormatter={formatter} />
+                <YAxis stroke="#A0AEC0" tickFormatter={formatter} domain={['dataMin', 'dataMax']} />
                 <Tooltip
                     contentStyle={{ backgroundColor: '#2D3748', border: 'none', color: '#E2E8F0', borderRadius: '0.5rem' }}
                     labelStyle={{ fontWeight: 'bold' }}
                     formatter={(value) => [formatter(value), title]}
                 />
                 <Legend />
-                <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 8 }} />
+                <Line type="monotone" dataKey={dataKey} name={title} stroke={color} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 8 }} />
             </LineChart>
         </ResponsiveContainer>
     </div>
 );
 
-export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear, currentWeek, t }) => {
+
+export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, currentYear, currentWeek, t }) => {
     const [historicalData, setHistoricalData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -45,13 +46,16 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
             const basePath = `artifacts/${appId}/public/data`;
 
             for (let i = 0; i < weeksToFetch; i++) {
-                const week = currentWeek - i;
-                const year = week <= 0 ? currentYear - 1 : currentYear;
-                const adjustedWeek = week <= 0 ? 52 + week : week;
+                let week = currentWeek - i;
+                let year = currentYear;
+                if (week <= 0) {
+                    year = currentYear - 1;
+                    week = 52 + week;
+                }
 
-                const salesQuery = query(collection(db, `${basePath}/sales`), where("storeId", "==", selectedStore), where("week", "==", adjustedWeek), where("year", "==", year));
-                const scheduleDocRef = doc(db, `${basePath}/schedules`, `${selectedStore}-${year}-W${adjustedWeek}`);
-                const stcDocRef = doc(db, `${basePath}/stc`, `${selectedStore}-${year}-W${adjustedWeek}`);
+                const salesQuery = query(collection(db, `${basePath}/sales`), where("storeId", "==", selectedStore), where("week", "==", week), where("year", "==", year));
+                const scheduleDocRef = doc(db, `${basePath}/schedules`, `${selectedStore}-${year}-W${week}`);
+                const stcDocRef = doc(db, `${basePath}/stc`, `${selectedStore}-${year}-W${week}`);
 
                 const [salesSnapshot, scheduleDoc, stcDoc] = await Promise.all([
                     getDocs(salesQuery),
@@ -63,10 +67,10 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
                 const weeklySchedule = scheduleDoc.exists() ? scheduleDoc.data() : { rows: [] };
                 const weeklyStc = stcDoc.exists() ? stcDoc.data() : { days: {} };
 
-                data.push({ week: adjustedWeek, year, sales: weeklySales, schedule: weeklySchedule, stc: weeklyStc });
+                data.push({ week, year, sales: weeklySales, schedule: weeklySchedule, stc: weeklyStc });
             }
 
-            setHistoricalData(data.reverse());
+            setHistoricalData(data.reverse()); // Oldest to newest
             setIsLoading(false);
         };
 
@@ -97,46 +101,36 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
         });
     }, [historicalData]);
 
-    const { totalSales, totalReturns, avgTransactionValue, unitsPerTransaction, giftCardSales, categorySalesData } = useMemo(() => {
+    const currentWeekMetrics = useMemo(() => {
+        const sales = allSales.filter(s => s.storeId === selectedStore);
+        const schedule = allSchedules.find(s => s.id === `${selectedStore}-${currentYear}-W${currentWeek}`) || { rows: [] };
+        
         const merchandiseSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
         const returns = sales.filter(s => s.type === TRANSACTION_TYPES.RETURN);
         const giftCardSalesData = sales.filter(s => s.type === TRANSACTION_TYPES.GIFT_CARD);
 
         const totalTransactions = merchandiseSales.length;
-        const grossSales = merchandiseSales.reduce((sum, s) => sum + s.total, 0);
         const totalReturnValue = returns.reduce((sum, s) => sum + s.total, 0);
-        const netSales = grossSales + totalReturnValue;
+        const netSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
 
         const totalQuantity = merchandiseSales.reduce((sum, sale) => {
             return sum + (sale.items || []).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 0), 0);
         }, 0);
-        
+
         const categoryTotals = {};
         sales.forEach(sale => {
-            if (sale.type !== TRANSACTION_TYPES.RETURN) {
-                (sale.items || []).forEach(item => {
-                    const itemValue = item.total || (item.price * item.quantity);
-                    if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
-                    categoryTotals[item.category] += itemValue;
-                });
-            }
+            if (sale.type === TRANSACTION_TYPES.RETURN || sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
+            (sale.items || []).forEach(item => {
+                const itemValue = item.total || (item.price * item.quantity);
+                if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
+                categoryTotals[item.category] += itemValue;
+            });
         });
+        const categoryData = Object.entries(categoryTotals).map(([name, value]) => ({ name: t[name] || name, value })).filter(d => d.value > 0);
 
-        return {
-            totalSales: netSales,
-            totalReturns: totalReturnValue,
-            avgTransactionValue: totalTransactions > 0 ? netSales / totalTransactions : 0,
-            unitsPerTransaction: totalTransactions > 0 ? totalQuantity / totalTransactions : 0,
-            giftCardSales: giftCardSalesData.reduce((sum, s) => sum + s.total, 0),
-            categorySalesData: Object.entries(categoryTotals).map(([name, value]) => ({ name, value })).filter(d => d.value > 0)
-        };
-    }, [sales]);
-
-    const weeklySellersAnalysis = useMemo(() => {
-        if (!schedule?.rows) return [];
         const employeeAnalysis = new Map();
 
-        schedule.rows.filter(row => row.name).forEach(row => {
+        (schedule.rows || []).filter(row => row.name).forEach(row => {
             employeeAnalysis.set(row.name, {
                 name: row.name,
                 objective: row.objective || 0,
@@ -155,7 +149,7 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
             
             (sale.items || []).forEach(item => {
                 const rep = item.salesRep;
-                 const itemValue = item.total || (item.price * item.quantity);
+                const itemValue = item.total || (item.price * item.quantity);
 
                 if (employeeAnalysis.has(rep)) {
                     const emp = employeeAnalysis.get(rep);
@@ -182,8 +176,7 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
             });
         });
 
-
-        return Array.from(employeeAnalysis.values()).map(emp => ({
+        const weeklySellersAnalysis = Array.from(employeeAnalysis.values()).map(emp => ({
             ...emp,
             differential: emp.totalSales - emp.objective,
             percentOfObjective: emp.objective > 0 ? (emp.totalSales / emp.objective) * 100 : 0,
@@ -191,76 +184,79 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
             dollarsPerTransaction: emp.numTransactions > 0 ? emp.totalSales / emp.numTransactions : 0,
             unitsPerTransaction: emp.numTransactions > 0 ? emp.unitsSold / emp.numTransactions : 0,
         }));
-
-    }, [sales, schedule]);
+        
+        return {
+            totalSales: netSales,
+            totalReturns: totalReturnValue,
+            avgTransactionValue: totalTransactions > 0 ? netSales / totalTransactions : 0,
+            unitsPerTransaction: totalTransactions > 0 ? totalQuantity / totalTransactions : 0,
+            giftCardSales: giftCardSalesData.reduce((sum, s) => sum + s.total, 0),
+            categoryData,
+            weeklySellersAnalysis
+        };
+    }, [allSales, allSchedules, selectedStore, currentWeek, currentYear, t]);
 
     const analysisTotals = useMemo(() => {
         const totals = {
-            objective: 0,
-            totalSales: 0,
-            differential: 0,
-            numTransactions: 0,
-            unitsSold: 0,
-            hoursWorked: 0,
-            categoryUnits: {}
+            objective: 0, totalSales: 0, numTransactions: 0, unitsSold: 0, hoursWorked: 0,
+            categoryUnits: SALE_CATEGORIES.reduce((acc, cat) => ({ ...acc, [cat]: 0 }), {})
         };
-        SALE_CATEGORIES.forEach(cat => totals.categoryUnits[cat] = 0);
-
-        weeklySellersAnalysis.forEach(seller => {
+        currentWeekMetrics.weeklySellersAnalysis.forEach(seller => {
             totals.objective += seller.objective;
             totals.totalSales += seller.totalSales;
             totals.numTransactions += seller.numTransactions;
             totals.unitsSold += seller.unitsSold;
             totals.hoursWorked += seller.hoursWorked;
-            SALE_CATEGORIES.forEach(cat => {
-                totals.categoryUnits[cat] += seller.categoryUnits[cat];
-            });
+            SALE_CATEGORIES.forEach(cat => totals.categoryUnits[cat] += seller.categoryUnits[cat]);
         });
-
         totals.differential = totals.totalSales - totals.objective;
         totals.percentOfObjective = totals.objective > 0 ? (totals.totalSales / totals.objective) * 100 : 0;
         totals.dollarsPerHour = totals.hoursWorked > 0 ? totals.totalSales / totals.hoursWorked : 0;
         totals.dollarsPerTransaction = totals.numTransactions > 0 ? totals.totalSales / totals.numTransactions : 0;
         totals.unitsPerTransaction = totals.numTransactions > 0 ? totals.unitsSold / totals.numTransactions : 0;
-
         return totals;
-    }, [weeklySellersAnalysis]);
+    }, [currentWeekMetrics.weeklySellersAnalysis]);
 
     return (
         <div className="space-y-8">
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                  <h2 className="text-xl font-bold mb-4 text-white">{t.currentWeekPerformance}</h2>
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <ReportStatCard title={t.netSales} value={formatCurrency(totalSales)} />
-                    <ReportStatCard title={t.totalReturns} value={formatCurrency(totalReturns)} />
-                    <ReportStatCard title={t.giftCardsSold} value={formatCurrency(giftCardSales)} />
-                    <ReportStatCard title={t.avgDollarValue} value={formatCurrency(avgTransactionValue)} />
-                    <ReportStatCard title={t.upt} value={unitsPerTransaction.toFixed(2)} />
+                    <ReportStatCard title={t.netSales} value={formatCurrency(currentWeekMetrics.totalSales)} />
+                    <ReportStatCard title={t.totalReturns} value={formatCurrency(currentWeekMetrics.totalReturns)} />
+                    <ReportStatCard title={t.giftCardsSold} value={formatCurrency(currentWeekMetrics.giftCardSales)} />
+                    <ReportStatCard title={t.avgDollarValue} value={formatCurrency(currentWeekMetrics.avgTransactionValue)} />
+                    <ReportStatCard title={t.upt} value={currentWeekMetrics.unitsPerTransaction.toFixed(2)} />
                  </div>
             </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 <div className="lg:col-span-1 bg-gray-800 p-6 rounded-lg shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-white">{t.salesContributionByCategory}</h2>
-                    <ResponsiveContainer width="100%" height={300}>
+                     <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
-                            <Pie data={categorySalesData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                                {categorySalesData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                            <Pie data={currentWeekMetrics.categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                                {currentWeekMetrics.categoryData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
                             </Pie>
                             <Tooltip formatter={(value) => formatCurrency(value)} />
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <div className="lg:col-span-2 bg-gray-800 p-6 rounded-lg shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-white">{t.weeklyTrendAnalysis}</h2>
                     {isLoading ? (
-                        <div className="flex justify-center items-center h-64">
+                        <div className="flex justify-center items-center h-full">
                             <RefreshCw className="animate-spin text-blue-400" size={48} />
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                             <TrendChart data={trendData} dataKey="netSales" title={t.netSales} color="#8884d8" formatter={formatCurrency} />
+                            <TrendChart data={trendData} dataKey="conversionRate" title={t.conversionRate} color="#82ca9d" formatter={(v) => `${v.toFixed(2)}%`} />
+                            <TrendChart data={trendData} dataKey="dollarsPerHour" title={t.dph} color="#ffc658" formatter={formatCurrency} />
+                            <TrendChart data={trendData} dataKey="avgTransactionValue" title={t.dpt} color="#ff8042" formatter={formatCurrency} />
                         </div>
                     )}
                 </div>
@@ -283,11 +279,11 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
                                 <th className="px-2 py-3 text-right">{t.dph}</th>
                                 <th className="px-2 py-3 text-right">{t.dpt}</th>
                                 <th className="px-2 py-3 text-right">{t.upt}</th>
-                                {SALE_CATEGORIES.map(cat => <th key={cat} className="px-2 py-3 text-right">{cat.slice(0,5)}</th>)}
+                                {SALE_CATEGORIES.map(cat => <th key={cat} className="px-2 py-3 text-right">{t[cat] || cat.slice(0,5)}</th>)}
                             </tr>
                         </thead>
                         <tbody>
-                            {weeklySellersAnalysis.map(seller => (
+                            {currentWeekMetrics.weeklySellersAnalysis.map(seller => (
                                 <tr key={seller.name} className="bg-gray-800 border-b border-gray-700">
                                     <td className="px-2 py-2 font-medium">{seller.name}</td>
                                     <td className="px-2 py-2 text-right">{formatCurrency(seller.objective)}</td>
@@ -295,12 +291,12 @@ export const Reports = ({ sales, schedule, db, appId, selectedStore, currentYear
                                     <td className={`px-2 py-2 text-right ${seller.differential < 0 ? 'text-red-400' : 'text-green-400'}`}>{formatCurrency(seller.differential)}</td>
                                     <td className="px-2 py-2 text-right">{seller.percentOfObjective.toFixed(2)}%</td>
                                     <td className="px-2 py-2 text-right">{seller.numTransactions.toFixed(0)}</td>
-                                    <td className="px-2 py-2 text-right">{seller.unitsSold.toFixed(2)}</td>
+                                    <td className="px-2 py-2 text-right">{seller.unitsSold.toFixed(0)}</td>
                                     <td className="px-2 py-2 text-right">{seller.hoursWorked.toFixed(2)}</td>
                                     <td className="px-2 py-2 text-right">{formatCurrency(seller.dollarsPerHour)}</td>
                                     <td className="px-2 py-2 text-right">{formatCurrency(seller.dollarsPerTransaction)}</td>
                                     <td className="px-2 py-2 text-right">{seller.unitsPerTransaction.toFixed(2)}</td>
-                                    {SALE_CATEGORIES.map(cat => <td key={cat} className="px-2 py-2 text-right">{seller.categoryUnits[cat].toFixed(2)}</td>)}
+                                    {SALE_CATEGORIES.map(cat => <td key={cat} className="px-2 py-2 text-right">{seller.categoryUnits[cat].toFixed(0)}</td>)}
                                 </tr>
                             ))}
                         </tbody>
