@@ -32,6 +32,19 @@ const TrendChart = ({ data, dataKey, title, color, formatter }) => (
     </div>
 );
 
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+        <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+            {`${(percent * 100).toFixed(0)}%`}
+        </text>
+    );
+};
+
 
 export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, currentYear, currentWeek, t }) => {
     const [historicalData, setHistoricalData] = useState([]);
@@ -235,12 +248,21 @@ export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, curr
                     <h2 className="text-xl font-bold mb-4 text-white">{t.salesContributionByCategory}</h2>
                      <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
-                            <Pie data={currentWeekMetrics.categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                            <Pie 
+                                data={currentWeekMetrics.categoryData} 
+                                dataKey="value" 
+                                nameKey="name" 
+                                cx="50%" 
+                                cy="50%" 
+                                outerRadius={100} 
+                                labelLine={false}
+                                label={renderCustomizedLabel}
+                            >
                                 {currentWeekMetrics.categoryData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value) => formatCurrency(value)} />
+                            <Tooltip formatter={(value, name, props) => [`${formatCurrency(value)} (${(props.payload.percent * 100).toFixed(2)}%)`, name]} />
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>

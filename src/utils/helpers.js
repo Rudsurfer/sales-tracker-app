@@ -1,3 +1,5 @@
+// This file contains reusable helper functions used in various parts of the application.
+
 export const formatCurrency = (value) => {
     const num = Number(value);
     if (isNaN(num)) return '$0.00';
@@ -5,13 +7,29 @@ export const formatCurrency = (value) => {
 };
 
 export const getWeekNumber = (d) => {
+    // Fiscal year definition based on user feedback: Week 1 of 2025 starts on Sunday, Feb 2, 2025.
+    const fiscalYearStart = new Date(Date.UTC(2025, 1, 2)); // Month is 0-indexed, so 1 is February.
+
     const date = new Date(d.valueOf());
-    date.setHours(0, 0, 0, 0);
-    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-    const firstDayOfWeek = firstDayOfYear.getDay();
-    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-    return Math.ceil((pastDaysOfYear + firstDayOfWeek + 1) / 7);
+    date.setUTCHours(0, 0, 0, 0); // Use UTC to prevent timezone shifts from affecting the date.
+
+    // Calculate the start of the week (Sunday) for the given date.
+    const dayOfWeek = date.getUTCDay(); // Sunday = 0, Monday = 1, ...
+    const startOfWeek = new Date(date);
+    startOfWeek.setUTCDate(date.getUTCDate() - dayOfWeek);
+
+    // Calculate the difference in milliseconds between the start of the current week and the fiscal year start.
+    const diffMillis = startOfWeek - fiscalYearStart;
+
+    // Convert the difference to days, then to weeks.
+    // We add 1 because the first week is Week 1, not Week 0.
+    const diffWeeks = Math.floor(diffMillis / (1000 * 60 * 60 * 24 * 7));
+    
+    // This logic handles dates within the fiscal year 2025.
+    // For dates before Feb 2, 2025, it will produce week numbers <= 0, which may need adjustment if historical accuracy is needed.
+    return diffWeeks + 1;
 };
+
 
 export const parseShift = (shift) => {
     if (!shift || typeof shift !== 'string' || shift.toLowerCase() === 'off' || shift.toLowerCase() === 'o' || shift.toLowerCase() === 'vac' || shift.toLowerCase() === 'vacation') {
