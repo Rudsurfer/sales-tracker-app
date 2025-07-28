@@ -99,7 +99,6 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
 
         homeStoreEmployees.forEach(emp => {
             let totalHours = 0;
-            let totalSales = 0;
 
             allSchedules.forEach(sched => {
                 const row = sched.rows.find(r => r.id === emp.id);
@@ -107,25 +106,14 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
                     totalHours += Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
                 }
             });
-            
-            allSales.forEach(sale => {
-                (sale.items || []).forEach(item => {
-                    if(item.salesRep === emp.name) {
-                        const itemValue = item.total || (item.price * item.quantity);
-                        totalSales += itemValue;
-                    }
-                });
-            });
-
-            const commission = totalSales * (parseFloat(emp.commissionPlan || '2') / 100);
 
             if (emp.baseSalary > 0) {
                  const effectiveHourlyRate = (emp.baseSalary / 52) / 40;
-                 totalCostForPercentage += (effectiveHourlyRate * totalHours) + commission;
+                 totalCostForPercentage += (effectiveHourlyRate * totalHours);
             } else {
                 const regularHours = Math.min(totalHours, 40);
                 const otHours = Math.max(0, totalHours - 40);
-                const gross = (emp.rate * regularHours) + (emp.rate * 1.5 * otHours) + commission;
+                const gross = (emp.rate * regularHours) + (emp.rate * 1.5 * otHours);
                 totalCostForPercentage += gross;
             }
         });

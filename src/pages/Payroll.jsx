@@ -109,9 +109,9 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
             if (emp && emp.baseSalary > 0) {
                 const effectiveHourlyRate = (emp.baseSalary / 52) / 40;
                 const totalHours = row.regularHours + row.otHours;
-                totalCostForPercentage += (effectiveHourlyRate * totalHours) + row.commission;
+                totalCostForPercentage += (effectiveHourlyRate * totalHours);
             } else {
-                totalCostForPercentage += row.weeklyGrossEarnings;
+                totalCostForPercentage += (row.weeklyGrossEarnings - row.commission);
             }
         });
 
