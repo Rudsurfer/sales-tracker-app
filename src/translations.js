@@ -1,3 +1,6 @@
+// This file contains all the text strings for the application in both English and French.
+// This makes it easy to manage translations.
+
 export const translations = {
     en: {
         dashboard: 'Dashboard',
@@ -170,6 +173,7 @@ export const translations = {
         confirmImport: 'Confirm Import',
         importSuccess: 'Successfully imported employee data!',
         importError: 'Error importing CSV. Please check the file format.',
+        downloadTemplate: 'Download Template',
     },
     fr: {
         dashboard: 'Tableau de Bord',
@@ -342,5 +346,6 @@ export const translations = {
         confirmImport: 'Confirmer l\'importation',
         importSuccess: 'Données des employés importées avec succès!',
         importError: 'Erreur lors de l\'importation du CSV. Veuillez vérifier le format du fichier.',
+        downloadTemplate: 'Télécharger le Modèle',
     }
 };
