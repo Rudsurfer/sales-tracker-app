@@ -35,7 +35,7 @@ const GoalProgressCard = ({ title, actual, target, percent }) => {
     );
 };
 
-const KPIStatCard = ({ title, value, icon: Icon, color, valueColor }) => {
+const KPIStatCard = ({ title, value, icon: Icon, color, valueColorClass = 'text-white' }) => {
     const colors = {
         purple: 'text-purple-400',
         blue: 'text-blue-400',
@@ -47,35 +47,32 @@ const KPIStatCard = ({ title, value, icon: Icon, color, valueColor }) => {
                 <p className="text-sm text-gray-400">{title}</p>
                 <Icon size={20} className={colors[color]} />
             </div>
-            <p className={`text-4xl font-bold mt-2 ${valueColor || 'text-white'}`}>{value}</p>
+            <p className={`text-4xl font-bold mt-2 ${valueColorClass}`}>{value}</p>
         </div>
     );
 };
 
 export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, allSales, selectedStore, allEmployees }) => {
     const { netSales, avgTransactionValue, unitsPerTransaction, conversionRate, leaderboardData, categorySalesData, payrollPercentage, payrollPercentageColor } = useMemo(() => {
-        const currentStoreSales = allSales.filter(s => s.storeId === selectedStore);
-        let totalNetSales = 0;
+        let totalNetSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
+        
         const employeeSalesMap = new Map();
         const categoryTotals = {};
 
-        currentStoreSales.forEach(sale => {
-            if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
-            totalNetSales += sale.total;
+        sales.forEach(sale => {
+            if (sale.type === TRANSACTION_TYPES.GIFT_CARD || sale.type === TRANSACTION_TYPES.RETURN) return;
             (sale.items || []).forEach(item => {
                 const rep = item.salesRep;
                  const itemValue = item.total || (item.price * item.quantity);
                 if(rep) {
                     employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
                 }
-                if (sale.type !== TRANSACTION_TYPES.RETURN) {
-                    if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
-                    categoryTotals[item.category] += itemValue;
-                }
+                if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
+                categoryTotals[item.category] += itemValue;
             });
         });
         
-        const merchandiseSales = currentStoreSales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
+        const merchandiseSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
         const totalTransactions = merchandiseSales.length;
         const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
         
@@ -97,7 +94,7 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
             .filter(d => d.value > 0)
             .sort((a,b) => b.value - a.value);
             
-        let totalPayrollCost = 0;
+        let totalCostForPercentage = 0;
         const homeStoreEmployees = allEmployees.filter(e => e.associatedStore === selectedStore);
 
         homeStoreEmployees.forEach(emp => {
@@ -120,22 +117,23 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
                 });
             });
 
-            const regularHours = Math.min(totalHours, 40);
-            const otHours = Math.max(0, totalHours - 40);
             const commission = totalSales * (parseFloat(emp.commissionPlan || '2') / 100);
-            const base = (emp.baseSalary / 52) || 0;
-            const rate = emp.rate || 0;
-            const gross = (rate * regularHours) + (rate * 1.5 * otHours) + base + commission;
-            totalPayrollCost += gross;
+
+            if (emp.baseSalary > 0) {
+                 const effectiveHourlyRate = (emp.baseSalary / 52) / 40;
+                 totalCostForPercentage += (effectiveHourlyRate * totalHours) + commission;
+            } else {
+                const regularHours = Math.min(totalHours, 40);
+                const otHours = Math.max(0, totalHours - 40);
+                const gross = (emp.rate * regularHours) + (emp.rate * 1.5 * otHours) + commission;
+                totalCostForPercentage += gross;
+            }
         });
         
-        const calculatedPayrollPercentage = totalNetSales > 0 ? (totalPayrollCost / totalNetSales) * 100 : 0;
+        const percentage = totalNetSales > 0 ? (totalCostForPercentage / totalNetSales) * 100 : 0;
         let colorClass = 'text-green-400';
-        if (calculatedPayrollPercentage > 16 && calculatedPayrollPercentage < 20) {
-            colorClass = 'text-yellow-400';
-        } else if (calculatedPayrollPercentage >= 20) {
-            colorClass = 'text-red-400';
-        }
+        if (percentage > 16 && percentage < 20) colorClass = 'text-yellow-400';
+        else if (percentage >= 20) colorClass = 'text-red-400';
 
         return {
             netSales: totalNetSales,
@@ -144,7 +142,7 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
             conversionRate: totalTraffic > 0 ? (totalSTCTransactions / totalTraffic) * 100 : 0,
             leaderboardData: leaderboard,
             categorySalesData: categorySales,
-            payrollPercentage: calculatedPayrollPercentage,
+            payrollPercentage: percentage,
             payrollPercentageColor: colorClass
         };
     }, [sales, stcData, allSchedules, allSales, selectedStore, allEmployees]);
@@ -152,7 +150,7 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
     const dailyTarget = performanceGoals.daily?.[todayString.toLowerCase()] || 0;
     const dailyActual = sales.filter(s => s.day === todayString && s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
-    const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
+    const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyActual) * 100 : 0;
 
     const weeklyTarget = performanceGoals.weeklySalesTarget || 0;
     const weeklyPercent = weeklyTarget > 0 ? (netSales / weeklyTarget) * 100 : 0;
@@ -165,7 +163,7 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
                 <KPIStatCard title={t.conversionRate} value={`${conversionRate.toFixed(2)}%`} icon={Percent} color="purple" />
                 <KPIStatCard title={t.dollarsPerTransaction} value={formatCurrency(avgTransactionValue)} icon={DollarSign} color="blue" />
                 <KPIStatCard title={t.unitsPerTransaction} value={unitsPerTransaction.toFixed(2)} icon={Hash} color="orange" />
-                <KPIStatCard title={t.payrollPercentage} value={`${payrollPercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColor={payrollPercentageColor} />
+                <KPIStatCard title={t.payrollPercentage} value={`${payrollPercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={payrollPercentageColor} />
             </div>
             <div className="lg:col-span-1 space-y-6">
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
