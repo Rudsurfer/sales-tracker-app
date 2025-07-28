@@ -150,7 +150,7 @@ export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, a
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
     const dailyTarget = performanceGoals.daily?.[todayString.toLowerCase()] || 0;
     const dailyActual = sales.filter(s => s.day === todayString && s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
-    const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyActual) * 100 : 0;
+    const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
 
     const weeklyTarget = performanceGoals.weeklySalesTarget || 0;
     const weeklyPercent = weeklyTarget > 0 ? (netSales / weeklyTarget) * 100 : 0;
