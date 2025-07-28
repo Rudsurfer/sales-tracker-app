@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, doc, writeBatch, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { Users, LogOut, PlusCircle, Trash2, Upload, Download } from 'lucide-react';
 import { ALL_STORES, JOB_TITLES } from '../constants';
