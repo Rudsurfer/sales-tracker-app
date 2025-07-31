@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { doc, setDoc, collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { PlusCircle, Trash2, Target, X, UserPlus, Printer, Lock, Unlock } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
