@@ -6,7 +6,7 @@ import { getWeekNumber } from '../utils/helpers';
 export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
     const [pin, setPin] = useState('');
     const [employee, setEmployee] = useState(null);
-    const [lastClockIn, setLastClockIn] = useState(null);
+    const [activeLog, setActiveLog] = useState(null);
     const [message, setMessage] = useState('');
 
     useEffect(() => {
@@ -20,11 +20,8 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
                 handlePinSubmit();
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
+        return () => window.removeEventListener('keydown', handleKeyDown);
     }, [pin, employee]);
 
     const handlePinInput = (num) => {
@@ -36,24 +33,24 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     const handleClear = () => setPin('');
     const handleDelete = () => setPin(pin.slice(0, -1));
 
+    const findOpenLog = async (employeeId) => {
+        const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
+        const q = query(timeLogRef, where("employeeId", "==", employeeId), where("clockOut", "==", null), limit(1));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const doc = querySnapshot.docs[0];
+            return { id: doc.id, ...doc.data() };
+        }
+        return null;
+    };
+
     const handlePinSubmit = async () => {
         if (pin.length === 0) return;
         const foundEmployee = allEmployees.find(e => e.positionId === pin);
         if (foundEmployee) {
+            const openLog = await findOpenLog(foundEmployee.id);
+            setActiveLog(openLog);
             setEmployee(foundEmployee);
-            const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
-            const q = query(timeLogRef, where("employeeId", "==", foundEmployee.id), orderBy("clockIn", "desc"), limit(1));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const lastLog = querySnapshot.docs[0].data();
-                if (!lastLog.clockOut) {
-                    setLastClockIn({ id: querySnapshot.docs[0].id, ...lastLog });
-                } else {
-                    setLastClockIn(null);
-                }
-            } else {
-                setLastClockIn(null);
-            }
             setMessage('');
         } else {
             setMessage(t.invalidPin);
@@ -62,7 +59,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     };
 
     const handleClockIn = async () => {
-        if (lastClockIn) {
+        if (activeLog) {
             setNotification({ message: t.alreadyClockedIn, type: 'error' });
             return;
         }
@@ -78,7 +75,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
                 year: now.getFullYear(),
             };
             const docRef = await addDoc(timeLogRef, newLog);
-            setLastClockIn({ id: docRef.id, ...newLog, clockIn: new Date() });
+            setActiveLog({ id: docRef.id, ...newLog, clockIn: new Date() });
             setNotification({ message: t.clockInSuccess, type: 'success' });
             setTimeout(resetState, 2000);
         } catch (error) {
@@ -87,16 +84,14 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     };
 
     const handleClockOut = async () => {
-        if (!lastClockIn) {
+        if (!activeLog) {
             setNotification({ message: t.notClockedIn, type: 'error' });
             return;
         }
         try {
-            const docRef = doc(db, `artifacts/${appId}/public/data/time_logs`, lastClockIn.id);
-            await updateDoc(docRef, {
-                clockOut: serverTimestamp()
-            });
-            setLastClockIn(null);
+            const docRef = doc(db, `artifacts/${appId}/public/data/time_logs`, activeLog.id);
+            await updateDoc(docRef, { clockOut: serverTimestamp() });
+            setActiveLog(null);
             setNotification({ message: t.clockOutSuccess, type: 'success' });
             setTimeout(resetState, 2000);
         } catch (error) {
@@ -107,13 +102,13 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     const resetState = () => {
         setPin('');
         setEmployee(null);
-        setLastClockIn(null);
+        setActiveLog(null);
         setMessage('');
     };
 
     if (employee) {
-        const statusText = lastClockIn ? "Status: Clocked In" : "Status: Clocked Out";
-        const statusColor = lastClockIn ? "bg-green-500" : "bg-red-500";
+        const statusText = activeLog ? "Status: Clocked In" : "Status: Clocked Out";
+        const statusColor = activeLog ? "bg-green-500" : "bg-red-500";
         
         return (
             <div className="w-full h-screen bg-gray-900 flex flex-col items-center justify-center p-8">
@@ -124,7 +119,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
                     <span className="text-white">{statusText}</span>
                 </div>
                 <div className="flex space-x-4">
-                    {!lastClockIn ? (
+                    {!activeLog ? (
                         <button onClick={handleClockIn} className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-2xl">{t.clockIn}</button>
                     ) : (
                         <button onClick={handleClockOut} className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-2xl">{t.clockOut}</button>
