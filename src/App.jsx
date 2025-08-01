@@ -46,6 +46,7 @@ export default function App() {
     const [allEmployees, setAllEmployees] = useState([]);
     const [allSchedules, setAllSchedules] = useState([]);
     const [allSales, setAllSales] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     const [sales, setSales] = useState([]);
     const [schedule, setSchedule] = useState({ rows: [] });
@@ -80,8 +81,10 @@ export default function App() {
 
     useEffect(() => {
         if (!isAuthReady || !db) return;
+        setIsLoading(true);
         const unsub = onSnapshot(collection(db, `artifacts/${appId}/public/data/employees`), (snap) => {
             setAllEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setIsLoading(false);
         });
         return () => unsub();
     }, [isAuthReady, db]);
@@ -109,6 +112,8 @@ export default function App() {
     }, [isAuthReady, db, selectedStore, currentWeek, currentYear, currentDate, allSales]);
 
     useEffect(() => {
+        if (!selectedStore || !allEmployees.length || !allSchedules) return;
+        
         const currentStoreSchedule = allSchedules.find(s => s.id === `${selectedStore}-${currentYear}-W${currentWeek}`);
         const storeEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
 
@@ -127,16 +132,14 @@ export default function App() {
                 if (empData && empData.associatedStore === selectedStore) {
                     return { ...row, name: empData.name, jobTitle: empData.jobTitle };
                 }
-                // Allow guest employees to remain if they are in the schedule
                 if (empData && empData.associatedStore !== selectedStore) {
                     return row;
                 }
-                // If employee no longer exists, filter them out
                 if (!empData) return null;
                 return row;
             }).filter(Boolean);
             setSchedule({ ...currentStoreSchedule, rows: finalRows });
-        } else if (selectedStore && allEmployees.length > 0) {
+        } else {
             const newScheduleRows = storeEmployees.map(emp => ({ id: emp.id, name: emp.name, employeeId: emp.positionId, jobTitle: emp.jobTitle, objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {} }));
             setSchedule({ rows: newScheduleRows, week: currentWeek, year: currentYear });
         }
@@ -174,6 +177,9 @@ export default function App() {
     };
 
     const renderPage = () => {
+        if (isLoading) {
+             return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
+        }
         const props = { db, appId, t, language, setNotification, selectedStore, currentWeek, currentYear, currentDate, allEmployees, allSchedules, allSales, sales, schedule, stcData, performanceGoals, payroll, dailyPlanner };
         switch (currentPage) {
             case 'Dashboard': return <Dashboard {...props} />;
