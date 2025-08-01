@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart2, Target, ClipboardList, Calendar, FileText, DollarSign, TrendingUp, Users, LogOut } from 'lucide-react';
+import { BarChart2, Target, ClipboardList, Calendar, FileText, DollarSign, TrendingUp, Users, LogOut, Clock } from 'lucide-react';
 
 export const Sidebar = ({ currentPage, onNavClick, onChangeStore, t }) => {
     const navItems = [
@@ -11,9 +11,10 @@ export const Sidebar = ({ currentPage, onNavClick, onChangeStore, t }) => {
         { name: 'Daily Sales Log', key: 'dailySalesLog', icon: DollarSign },
         { name: 'STC', key: 'stc', icon: TrendingUp },
         { name: 'Reports', key: 'reports', icon: Users },
+        { name: 'Time Clock', key: 'timeClock', icon: Clock },
     ];
     return (
-        <nav className="w-64 bg-gray-800/50 p-4 flex flex-col">
+        <nav className="w-64 bg-gray-800/50 p-4 flex flex-col no-print">
             <div>
                 <div className="text-white text-xl font-bold mb-10 flex items-center space-x-2">
                     <span>{t.salesTrackerTitle}</span>

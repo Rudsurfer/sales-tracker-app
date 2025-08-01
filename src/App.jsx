@@ -22,6 +22,7 @@ import { Schedule } from './pages/Schedule';
 import { STC } from './pages/STC';
 import { Payroll } from './pages/Payroll';
 import { Reports } from './pages/Reports';
+import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
@@ -183,6 +184,7 @@ export default function App() {
             case 'Payroll': return <Payroll {...props} />;
             case 'Daily Sales Log': return <DailySalesLog {...props} />;
             case 'Reports': return <Reports {...props} />;
+            case 'Time Clock': return <TimeClock {...props} />;
             default: return <Dashboard {...props} />;
         }
     };
@@ -191,12 +193,14 @@ export default function App() {
 
     if (view === 'storeSelector') return (
         <>
-            <StoreSelector onSelectStore={(id) => setPasscodeChallenge({ type: 'store', id })} onAdminClick={() => setPasscodeChallenge({ type: 'admin' })} language={language} setLanguage={setLanguage} t={t} stores={ALL_STORES} />
+            <StoreSelector onSelectStore={(id) => setPasscodeChallenge({ type: 'store', id })} onAdminClick={() => setPasscodeChallenge({ type: 'admin' })} onTimeClockClick={() => { setView('timeClock'); setSelectedStore(null); }} language={language} setLanguage={setLanguage} t={t} stores={ALL_STORES} />
             {passcodeChallenge && <PasscodeModal correctPasscode={passcodeChallenge.type === 'admin' ? '9160' : passcodeChallenge.id} onSuccess={handlePasscodeSuccess} onClose={() => setPasscodeChallenge(null)} t={t} />}
         </>
     );
     
     if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees }} />;
+    
+    if (view === 'timeClock') return <TimeClock onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees }} />;
 
     return (
         <div className="flex h-screen bg-gray-900 text-white font-sans">

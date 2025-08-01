@@ -284,7 +284,7 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
                                                         type="number" 
                                                         placeholder={t.actual} 
                                                         value={isEditing ? row.actualHours?.[dayKey] : (row.actualHours?.[dayKey] || 0).toFixed(2)} 
-                                                        readOnly={!isEditing && !isWeekLocked}
+                                                        readOnly={!isEditing || isWeekLocked}
                                                         onDoubleClick={() => !isWeekLocked && setEditingCell(`${row.id}-${dayKey}`)}
                                                         onBlur={() => setEditingCell(null)}
                                                         onChange={e => handleRowChange(row.id, 'actualHours', e.target.value, dayKey)} 
