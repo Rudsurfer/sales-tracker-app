@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { Clock, LogOut } from 'lucide-react';
+import { getWeekNumber } from '../utils/helpers';
 
-export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees, currentWeek, currentYear }) => {
+export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
     const [pin, setPin] = useState('');
     const [employee, setEmployee] = useState(null);
     const [lastClockIn, setLastClockIn] = useState(null);
@@ -66,17 +67,18 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees,
             return;
         }
         try {
+            const now = new Date();
             const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
             const newLog = {
                 employeeId: employee.id,
                 storeId: employee.associatedStore,
                 clockIn: serverTimestamp(),
                 clockOut: null,
-                week: currentWeek,
-                year: currentYear,
+                week: getWeekNumber(now),
+                year: now.getFullYear(),
             };
             const docRef = await addDoc(timeLogRef, newLog);
-            setLastClockIn({ id: docRef.id, ...newLog, clockIn: new Date() }); // Update local state immediately
+            setLastClockIn({ id: docRef.id, ...newLog, clockIn: new Date() });
             setNotification({ message: t.clockInSuccess, type: 'success' });
             setTimeout(resetState, 2000);
         } catch (error) {
@@ -94,7 +96,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees,
             await updateDoc(docRef, {
                 clockOut: serverTimestamp()
             });
-            setLastClockIn(null); // Update local state immediately
+            setLastClockIn(null);
             setNotification({ message: t.clockOutSuccess, type: 'success' });
             setTimeout(resetState, 2000);
         } catch (error) {

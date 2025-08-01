@@ -49,7 +49,7 @@ export default function App() {
     const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
 
     const [sales, setSales] = useState([]);
-    const [schedule, setSchedule] = useState(null); // Changed to null
+    const [schedule, setSchedule] = useState(null); // Initialize as null
     const [stcData, setStcData] = useState({ days: {} });
     const [performanceGoals, setPerformanceGoals] = useState({});
     const [payroll, setPayroll] = useState({});
@@ -216,7 +216,7 @@ export default function App() {
     
     if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees }} />;
     
-    if (view === 'timeClock') return <TimeClock onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees }} />;
+    if (view === 'timeClock') return <TimeClock onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees, currentWeek, currentYear }} />;
 
     return (
         <div className="flex h-screen bg-gray-900 text-white font-sans">
