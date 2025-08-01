@@ -3,15 +3,16 @@ import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimest
 import { Clock, LogOut } from 'lucide-react';
 import { getWeekNumber } from '../utils/helpers';
 
-export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
+export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees, currentWeek, currentYear }) => {
     const [pin, setPin] = useState('');
     const [employee, setEmployee] = useState(null);
     const [activeLog, setActiveLog] = useState(null);
     const [message, setMessage] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         const handleKeyDown = (event) => {
-            if (employee) return;
+            if (employee || isProcessing) return;
             if (event.key >= '0' && event.key <= '9') {
                 handlePinInput(event.key);
             } else if (event.key === 'Backspace') {
@@ -22,7 +23,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [pin, employee]);
+    }, [pin, employee, isProcessing]);
 
     const handlePinInput = (num) => {
         if (pin.length < 6) {
@@ -45,7 +46,8 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     };
 
     const handlePinSubmit = async () => {
-        if (pin.length === 0) return;
+        if (pin.length === 0 || isProcessing) return;
+        setIsProcessing(true);
         const foundEmployee = allEmployees.find(e => e.positionId === pin);
         if (foundEmployee) {
             const openLog = await findOpenLog(foundEmployee.id);
@@ -56,13 +58,12 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
             setMessage(t.invalidPin);
             setPin('');
         }
+        setIsProcessing(false);
     };
 
     const handleClockIn = async () => {
-        if (activeLog) {
-            setNotification({ message: t.alreadyClockedIn, type: 'error' });
-            return;
-        }
+        if (activeLog || isProcessing) return;
+        setIsProcessing(true);
         try {
             const now = new Date();
             const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
@@ -77,26 +78,26 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
             const docRef = await addDoc(timeLogRef, newLog);
             setActiveLog({ id: docRef.id, ...newLog, clockIn: new Date() });
             setNotification({ message: t.clockInSuccess, type: 'success' });
-            setTimeout(resetState, 2000);
         } catch (error) {
             console.error("Error clocking in:", error);
+            setNotification({ message: "Error clocking in.", type: 'error' });
         }
+        setIsProcessing(false);
     };
 
     const handleClockOut = async () => {
-        if (!activeLog) {
-            setNotification({ message: t.notClockedIn, type: 'error' });
-            return;
-        }
+        if (!activeLog || isProcessing) return;
+        setIsProcessing(true);
         try {
             const docRef = doc(db, `artifacts/${appId}/public/data/time_logs`, activeLog.id);
             await updateDoc(docRef, { clockOut: serverTimestamp() });
             setActiveLog(null);
             setNotification({ message: t.clockOutSuccess, type: 'success' });
-            setTimeout(resetState, 2000);
         } catch (error) {
             console.error("Error clocking out:", error);
+            setNotification({ message: "Error clocking out.", type: 'error' });
         }
+        setIsProcessing(false);
     };
 
     const resetState = () => {
@@ -120,12 +121,12 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
                 </div>
                 <div className="flex space-x-4">
                     {!activeLog ? (
-                        <button onClick={handleClockIn} className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-2xl">{t.clockIn}</button>
+                        <button onClick={handleClockIn} disabled={isProcessing} className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-2xl disabled:opacity-50">{t.clockIn}</button>
                     ) : (
-                        <button onClick={handleClockOut} className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-2xl">{t.clockOut}</button>
+                        <button onClick={handleClockOut} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-2xl disabled:opacity-50">{t.clockOut}</button>
                     )}
                 </div>
-                <button onClick={resetState} className="mt-8 text-gray-400 hover:text-white">{t.cancel}</button>
+                <button onClick={resetState} className="mt-8 text-gray-400 hover:text-white">{t.done}</button>
             </div>
         );
     }
@@ -146,7 +147,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
                     <button onClick={() => handlePinInput(0)} className="bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl p-4 rounded-lg">0</button>
                     <button onClick={handleDelete} className="bg-gray-600 hover:bg-gray-500 text-white font-bold p-4 rounded-lg">⌫</button>
                 </div>
-                <button onClick={handlePinSubmit} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg text-xl">{t.unlock}</button>
+                <button onClick={handlePinSubmit} disabled={isProcessing} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg text-xl disabled:opacity-50">{t.unlock}</button>
             </div>
         </div>
     );
