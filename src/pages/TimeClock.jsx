@@ -67,16 +67,18 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees,
         }
         try {
             const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
-            await addDoc(timeLogRef, {
+            const newLog = {
                 employeeId: employee.id,
                 storeId: employee.associatedStore,
                 clockIn: serverTimestamp(),
                 clockOut: null,
                 week: currentWeek,
                 year: currentYear,
-            });
+            };
+            const docRef = await addDoc(timeLogRef, newLog);
+            setLastClockIn({ id: docRef.id, ...newLog, clockIn: new Date() }); // Update local state immediately
             setNotification({ message: t.clockInSuccess, type: 'success' });
-            resetState();
+            setTimeout(resetState, 2000);
         } catch (error) {
             console.error("Error clocking in:", error);
         }
@@ -92,8 +94,9 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees,
             await updateDoc(docRef, {
                 clockOut: serverTimestamp()
             });
+            setLastClockIn(null); // Update local state immediately
             setNotification({ message: t.clockOutSuccess, type: 'success' });
-            resetState();
+            setTimeout(resetState, 2000);
         } catch (error) {
             console.error("Error clocking out:", error);
         }
