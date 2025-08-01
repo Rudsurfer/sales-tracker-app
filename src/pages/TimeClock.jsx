@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { Clock, LogOut } from 'lucide-react';
 
-export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
+export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees, currentWeek, currentYear }) => {
     const [pin, setPin] = useState('');
     const [employee, setEmployee] = useState(null);
     const [lastClockIn, setLastClockIn] = useState(null);
@@ -10,7 +10,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
 
     useEffect(() => {
         const handleKeyDown = (event) => {
-            if (employee) return; // Don't handle keyboard input on the clock in/out screen
+            if (employee) return;
             if (event.key >= '0' && event.key <= '9') {
                 handlePinInput(event.key);
             } else if (event.key === 'Backspace') {
@@ -72,6 +72,8 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
                 storeId: employee.associatedStore,
                 clockIn: serverTimestamp(),
                 clockOut: null,
+                week: currentWeek,
+                year: currentYear,
             });
             setNotification({ message: t.clockInSuccess, type: 'success' });
             resetState();
