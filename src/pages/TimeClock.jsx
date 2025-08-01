@@ -8,6 +8,24 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     const [lastClockIn, setLastClockIn] = useState(null);
     const [message, setMessage] = useState('');
 
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (employee) return; // Don't handle keyboard input on the clock in/out screen
+            if (event.key >= '0' && event.key <= '9') {
+                handlePinInput(event.key);
+            } else if (event.key === 'Backspace') {
+                handleDelete();
+            } else if (event.key === 'Enter') {
+                handlePinSubmit();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [pin, employee]);
+
     const handlePinInput = (num) => {
         if (pin.length < 6) {
             setPin(pin + num);
@@ -18,6 +36,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     const handleDelete = () => setPin(pin.slice(0, -1));
 
     const handlePinSubmit = async () => {
+        if (pin.length === 0) return;
         const foundEmployee = allEmployees.find(e => e.positionId === pin);
         if (foundEmployee) {
             setEmployee(foundEmployee);
@@ -86,10 +105,17 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
     };
 
     if (employee) {
+        const statusText = lastClockIn ? "Status: Clocked In" : "Status: Clocked Out";
+        const statusColor = lastClockIn ? "bg-green-500" : "bg-red-500";
+        
         return (
             <div className="w-full h-screen bg-gray-900 flex flex-col items-center justify-center p-8">
                 <h1 className="text-4xl font-bold text-white mb-2">{t.timeClock}</h1>
-                <p className="text-2xl text-gray-300 mb-8">{employee.name}</p>
+                <p className="text-2xl text-gray-300 mb-4">{employee.name}</p>
+                <div className="flex items-center gap-2 mb-8 p-2 bg-gray-800 rounded-lg">
+                    <span className={`w-4 h-4 rounded-full ${statusColor}`}></span>
+                    <span className="text-white">{statusText}</span>
+                </div>
                 <div className="flex space-x-4">
                     {!lastClockIn ? (
                         <button onClick={handleClockIn} className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-2xl">{t.clockIn}</button>
