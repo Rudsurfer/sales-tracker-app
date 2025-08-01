@@ -89,8 +89,17 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
         if (schedule) {
             setScheduleRows(schedule.rows || []);
             setIsWeekLocked(schedule.isLocked || false);
+        } else {
+            // Handle case where schedule is null (e.g., for a new store)
+            const storeEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
+            const newScheduleRows = storeEmployees.map(emp => ({
+                id: emp.id, name: emp.name, employeeId: emp.positionId, jobTitle: emp.jobTitle,
+                objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {}
+            }));
+            setScheduleRows(newScheduleRows);
+            setIsWeekLocked(false);
         }
-    }, [schedule]);
+    }, [schedule, allEmployees, selectedStore]);
 
     useEffect(() => {
         if (!db || !selectedStore || !currentWeek || !currentYear) return;

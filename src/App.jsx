@@ -46,10 +46,10 @@ export default function App() {
     const [allEmployees, setAllEmployees] = useState([]);
     const [allSchedules, setAllSchedules] = useState([]);
     const [allSales, setAllSales] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
 
     const [sales, setSales] = useState([]);
-    const [schedule, setSchedule] = useState({ rows: [] });
+    const [schedule, setSchedule] = useState(null); // Changed to null
     const [stcData, setStcData] = useState({ days: {} });
     const [performanceGoals, setPerformanceGoals] = useState({});
     const [payroll, setPayroll] = useState({});
@@ -82,36 +82,29 @@ export default function App() {
 
     useEffect(() => {
         if (!isAuthReady || !db) return;
-        setIsLoading(true);
-        const unsub = onSnapshot(collection(db, `artifacts/${appId}/public/data/employees`), (snap) => {
+        setIsCoreDataLoading(true);
+        const unsubEmployees = onSnapshot(collection(db, `artifacts/${appId}/public/data/employees`), (snap) => {
             setAllEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setIsLoading(false);
         });
-        return () => unsub();
-    }, [isAuthReady, db]);
-
-    useEffect(() => {
-        if (!isAuthReady || !db) return;
-        const qSales = query(collection(db, `artifacts/${appId}/public/data/sales`), where("week", "==", currentWeek), where("year", "==", currentYear));
-        const qSchedules = query(collection(db, `artifacts/${appId}/public/data/schedules`), where("week", "==", currentWeek), where("year", "==", currentYear));
-
-        const unsubSales = onSnapshot(qSales, (snap) => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubSchedules = onSnapshot(qSchedules, (snap) => setAllSchedules(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-        return () => { unsubSales(); unsubSchedules(); };
-    }, [isAuthReady, db, currentWeek, currentYear]);
-
-    useEffect(() => {
-        if (!isAuthReady || !db || !selectedStore) return;
         
-        setIsLoadingStoreData(true);
+        const qSchedules = query(collection(db, `artifacts/${appId}/public/data/schedules`), where("week", "==", currentWeek), where("year", "==", currentYear));
+        const unsubSchedules = onSnapshot(qSchedules, (snap) => {
+            setAllSchedules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setIsCoreDataLoading(false);
+        });
 
-        setSales(allSales.filter(s => s.storeId === selectedStore));
+        const qSales = query(collection(db, `artifacts/${appId}/public/data/sales`), where("week", "==", currentWeek), where("year", "==", currentYear));
+        const unsubSales = onSnapshot(qSales, (snap) => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-        const unsubStc = onSnapshot(doc(db, `artifacts/${appId}/public/data/stc`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setStcData(doc.exists() ? doc.data() : { days: {} }));
-        const unsubGoals = onSnapshot(doc(db, `artifacts/${appId}/public/data/performance_goals`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPerformanceGoals(doc.exists() ? doc.data() : {}));
-        const unsubPayroll = onSnapshot(doc(db, `artifacts/${appId}/public/data/payrolls`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPayroll(doc.exists() ? doc.data() : {}));
-        const unsubPlanner = onSnapshot(doc(db, `artifacts/${appId}/public/data/planners`, `${selectedStore}-${currentDate.toISOString().split('T')[0]}`), (doc) => setDailyPlanner(doc.exists() ? { id: doc.id, ...doc.data() } : null));
-
+        return () => { unsubEmployees(); unsubSchedules(); unsubSales(); };
+    }, [isAuthReady, db, currentWeek, currentYear]);
+    
+    useEffect(() => {
+        if (!selectedStore || isCoreDataLoading) {
+            if (!selectedStore) setSchedule(null);
+            return;
+        }
+        
         const currentStoreSchedule = allSchedules.find(s => s.id === `${selectedStore}-${currentYear}-W${currentWeek}`);
         const storeEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
 
@@ -137,15 +130,29 @@ export default function App() {
                 return row;
             }).filter(Boolean);
             setSchedule({ ...currentStoreSchedule, rows: finalRows });
-        } else if (selectedStore && allEmployees.length > 0) {
+        } else {
             const newScheduleRows = storeEmployees.map(emp => ({ id: emp.id, name: emp.name, employeeId: emp.positionId, jobTitle: emp.jobTitle, objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {} }));
-            setSchedule({ rows: newScheduleRows, week: currentWeek, year: currentYear });
+            setSchedule({ rows: newScheduleRows, week: currentWeek, year: currentYear, id: `${selectedStore}-${currentYear}-W${currentWeek}` });
         }
+
+    }, [selectedStore, allSchedules, allEmployees, currentWeek, currentYear, isCoreDataLoading]);
+
+
+    useEffect(() => {
+        if (!isAuthReady || !db || !selectedStore) return;
+        
+        setIsLoadingStoreData(true);
+        setSales(allSales.filter(s => s.storeId === selectedStore));
+
+        const unsubStc = onSnapshot(doc(db, `artifacts/${appId}/public/data/stc`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setStcData(doc.exists() ? doc.data() : { days: {} }));
+        const unsubGoals = onSnapshot(doc(db, `artifacts/${appId}/public/data/performance_goals`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPerformanceGoals(doc.exists() ? doc.data() : {}));
+        const unsubPayroll = onSnapshot(doc(db, `artifacts/${appId}/public/data/payrolls`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPayroll(doc.exists() ? doc.data() : {}));
+        const unsubPlanner = onSnapshot(doc(db, `artifacts/${appId}/public/data/planners`, `${selectedStore}-${currentDate.toISOString().split('T')[0]}`), (doc) => setDailyPlanner(doc.exists() ? { id: doc.id, ...doc.data() } : null));
         
         setIsLoadingStoreData(false);
 
         return () => { unsubStc(); unsubGoals(); unsubPayroll(); unsubPlanner(); };
-    }, [isAuthReady, db, selectedStore, currentWeek, currentYear, currentDate, allSales, allSchedules, allEmployees]);
+    }, [isAuthReady, db, selectedStore, currentWeek, currentYear, currentDate, allSales]);
 
     const handleNavClick = (page) => {
         if (page === 'Payroll' && !isPayrollUnlocked) {
@@ -180,7 +187,7 @@ export default function App() {
     };
 
     const renderPage = () => {
-        if (isLoading || isLoadingStoreData) {
+        if (isCoreDataLoading || isLoadingStoreData) {
              return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
         }
         const props = { db, appId, t, language, setNotification, selectedStore, currentWeek, currentYear, currentDate, allEmployees, allSchedules, allSales, sales, schedule, stcData, performanceGoals, payroll, dailyPlanner };
