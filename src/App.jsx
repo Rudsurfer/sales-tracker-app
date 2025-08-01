@@ -58,6 +58,7 @@ export default function App() {
     const [notification, setNotification] = useState(null);
     const [isPayrollUnlocked, setIsPayrollUnlocked] = useState(false);
     const [passcodeChallenge, setPasscodeChallenge] = useState(null);
+    const [isLoadingStoreData, setIsLoadingStoreData] = useState(false);
 
     const t = translations[language];
     const currentWeek = useMemo(() => getWeekNumber(currentDate), [currentDate]);
@@ -101,6 +102,9 @@ export default function App() {
 
     useEffect(() => {
         if (!isAuthReady || !db || !selectedStore) return;
+        
+        setIsLoadingStoreData(true);
+
         setSales(allSales.filter(s => s.storeId === selectedStore));
 
         const unsubStc = onSnapshot(doc(db, `artifacts/${appId}/public/data/stc`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setStcData(doc.exists() ? doc.data() : { days: {} }));
@@ -108,12 +112,6 @@ export default function App() {
         const unsubPayroll = onSnapshot(doc(db, `artifacts/${appId}/public/data/payrolls`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPayroll(doc.exists() ? doc.data() : {}));
         const unsubPlanner = onSnapshot(doc(db, `artifacts/${appId}/public/data/planners`, `${selectedStore}-${currentDate.toISOString().split('T')[0]}`), (doc) => setDailyPlanner(doc.exists() ? { id: doc.id, ...doc.data() } : null));
 
-        return () => { unsubStc(); unsubGoals(); unsubPayroll(); unsubPlanner(); };
-    }, [isAuthReady, db, selectedStore, currentWeek, currentYear, currentDate, allSales]);
-
-    useEffect(() => {
-        if (!selectedStore || !allEmployees.length || !allSchedules) return;
-        
         const currentStoreSchedule = allSchedules.find(s => s.id === `${selectedStore}-${currentYear}-W${currentWeek}`);
         const storeEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
 
@@ -139,11 +137,15 @@ export default function App() {
                 return row;
             }).filter(Boolean);
             setSchedule({ ...currentStoreSchedule, rows: finalRows });
-        } else {
+        } else if (selectedStore && allEmployees.length > 0) {
             const newScheduleRows = storeEmployees.map(emp => ({ id: emp.id, name: emp.name, employeeId: emp.positionId, jobTitle: emp.jobTitle, objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {} }));
             setSchedule({ rows: newScheduleRows, week: currentWeek, year: currentYear });
         }
-    }, [allSchedules, allEmployees, selectedStore, currentWeek, currentYear]);
+        
+        setIsLoadingStoreData(false);
+
+        return () => { unsubStc(); unsubGoals(); unsubPayroll(); unsubPlanner(); };
+    }, [isAuthReady, db, selectedStore, currentWeek, currentYear, currentDate, allSales, allSchedules, allEmployees]);
 
     const handleNavClick = (page) => {
         if (page === 'Payroll' && !isPayrollUnlocked) {
@@ -161,6 +163,7 @@ export default function App() {
             setIsPayrollUnlocked(true);
             setCurrentPage('Payroll');
         } else if (passcodeChallenge?.type === 'store') {
+            setIsLoadingStoreData(true);
             setSelectedStore(passcodeChallenge.id);
             setView('dashboard');
             setIsPayrollUnlocked(false);
@@ -177,7 +180,7 @@ export default function App() {
     };
 
     const renderPage = () => {
-        if (isLoading) {
+        if (isLoading || isLoadingStoreData) {
              return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
         }
         const props = { db, appId, t, language, setNotification, selectedStore, currentWeek, currentYear, currentDate, allEmployees, allSchedules, allSales, sales, schedule, stcData, performanceGoals, payroll, dailyPlanner };
