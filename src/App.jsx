@@ -200,7 +200,7 @@ export default function App() {
             case 'Payroll': return <Payroll {...props} />;
             case 'Daily Sales Log': return <DailySalesLog {...props} />;
             case 'Reports': return <Reports {...props} />;
-            case 'Time Clock': return <TimeClock {...props} />;
+            case 'Time Clock': return <TimeClock {...props} onExit={handleChangeStore} />;
             default: return <Dashboard {...props} />;
         }
     };

@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimest
 import { Clock, LogOut } from 'lucide-react';
 import { getWeekNumber } from '../utils/helpers';
 
-export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees, currentWeek, currentYear }) => {
+export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
     const [pin, setPin] = useState('');
     const [employee, setEmployee] = useState(null);
     const [activeLog, setActiveLog] = useState(null);
