@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { doc, setDoc, collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
-import { PlusCircle, Trash2, Target, X, UserPlus, Printer, Lock, Unlock } from 'lucide-react';
+import { doc, setDoc, collection, onSnapshot, query, where, Timestamp, addDoc } from 'firebase/firestore';
+import { PlusCircle, Trash2, Target, X, UserPlus, Printer, Lock, Unlock, Edit2 } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
-import { parseShift } from '../utils/helpers';
+import { parseShift, getWeekNumber } from '../utils/helpers';
 
 const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
@@ -75,6 +75,52 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
     );
 };
 
+const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => {
+    const [clockIn, setClockIn] = useState('');
+    const [clockOut, setClockOut] = useState('');
+    const [reason, setReason] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleSave = () => {
+        if (!clockIn || !clockOut || !reason) {
+            alert(t.fillAllFields);
+            return;
+        }
+        onSave({ clockIn, clockOut, reason });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Time Adjustment for {employeeName} on {day}</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In Time (e.g., 9:00am)</label>
+                        <input type="text" value={clockIn} onChange={e => setClockIn(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out Time (e.g., 5:30pm)</label>
+                        <input type="text" value={clockOut} onChange={e => setClockOut(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Reason for Adjustment</label>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" rows="3"></textarea>
+                    </div>
+                </div>
+                <div className="flex justify-end mt-6 space-x-4">
+                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">{t.cancel}</button>
+                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.saveChanges}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, selectedStore, setNotification, t, language, allEmployees }) => {
     const [scheduleRows, setScheduleRows] = useState([]);
     const [editingObjectivesFor, setEditingObjectivesFor] = useState(null);
@@ -83,6 +129,7 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
     const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
     const [isWeekLocked, setIsWeekLocked] = useState(false);
     const [editingCell, setEditingCell] = useState(null);
+    const [timeAdjustmentData, setTimeAdjustmentData] = useState(null);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
     useEffect(() => {
@@ -103,8 +150,8 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
         endOfWeek.setDate(endOfWeek.getDate() + 7);
 
         const q = query(timeLogRef, 
-            where("clockIn", ">=", Timestamp.fromDate(startOfWeek)),
-            where("clockIn", "<", Timestamp.fromDate(endOfWeek))
+            where("week", "==", currentWeek),
+            where("year", "==", currentYear)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -220,6 +267,48 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
         window.print();
     };
 
+    const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => {
+        if (!timeAdjustmentData) return;
+        const { row, dayIndex } = timeAdjustmentData;
+        
+        const date = new Date(currentYear, 0, 1 + (currentWeek - 1) * 7);
+        date.setDate(date.getDate() - date.getDay() + dayIndex);
+
+        const parseTime = (timeStr) => {
+            const isPm = timeStr.toLowerCase().includes('pm');
+            const isAm = timeStr.toLowerCase().includes('am');
+            let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(Number);
+            minutes = minutes || 0;
+            if (isPm && hours < 12) hours += 12;
+            if (isAm && hours === 12) hours = 0;
+            return { hours, minutes };
+        };
+
+        const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
+        const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
+
+        const clockInDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), inHours, inMinutes);
+        const clockOutDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), outHours, outMinutes);
+
+        try {
+            const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
+            await addDoc(timeLogRef, {
+                employeeId: row.id,
+                storeId: selectedStore,
+                clockIn: Timestamp.fromDate(clockInDate),
+                clockOut: Timestamp.fromDate(clockOutDate),
+                week: currentWeek,
+                year: currentYear,
+                isAdjustment: true,
+                adjustmentReason: reason,
+            });
+            setNotification({ message: "Time adjustment saved.", type: 'success' });
+        } catch (error) {
+            console.error("Error saving time adjustment:", error);
+            setNotification({ message: "Error saving adjustment.", type: 'error' });
+        }
+    };
+
     return (
         <>
             <style>{`
@@ -280,7 +369,7 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
                                                 <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300 no-print"><Target size={18}/></button>
                                             </div>
                                         </td>
-                                        {DAYS_OF_WEEK.map(day => {
+                                        {DAYS_OF_WEEK.map((day, dayIndex) => {
                                             const dayKey = day.toLowerCase();
                                             const shiftValue = row.shifts?.[dayKey] || '';
                                             const isVacation = shiftValue.toLowerCase().startsWith('vac');
@@ -290,17 +379,20 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
                                                 <div className="flex flex-col space-y-1">
                                                     <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.id, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
                                                     <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder={t.actual} 
-                                                        value={isEditing ? row.actualHours?.[dayKey] : (row.actualHours?.[dayKey] || 0).toFixed(2)} 
-                                                        readOnly={!isEditing || isWeekLocked}
-                                                        onDoubleClick={() => !isWeekLocked && setEditingCell(`${row.id}-${dayKey}`)}
-                                                        onBlur={() => setEditingCell(null)}
-                                                        onChange={e => handleRowChange(row.id, 'actualHours', e.target.value, dayKey)} 
-                                                        className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${isWeekLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`} 
-                                                        step="0.25" 
-                                                    />
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder={t.actual} 
+                                                            value={isEditing ? row.actualHours?.[dayKey] : (row.actualHours?.[dayKey] || 0).toFixed(2)} 
+                                                            readOnly={!isEditing || isWeekLocked}
+                                                            onDoubleClick={() => !isWeekLocked && setEditingCell(`${row.id}-${dayKey}`)}
+                                                            onBlur={() => setEditingCell(null)}
+                                                            onChange={e => handleRowChange(row.id, 'actualHours', e.target.value, dayKey)} 
+                                                            className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${isWeekLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`} 
+                                                            step="0.25" 
+                                                        />
+                                                        {!isWeekLocked && <button onClick={() => setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]})} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
+                                                    </div>
                                                 </div>
                                             </td>
                                         )})}
@@ -346,6 +438,16 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
             >
                 <p>{t.confirmLockWeek}</p>
             </ConfirmationModal>
+            {timeAdjustmentData && (
+                <TimeAdjustmentModal 
+                    isOpen={!!timeAdjustmentData}
+                    onClose={() => setTimeAdjustmentData(null)}
+                    onSave={handleTimeAdjustmentSave}
+                    employeeName={timeAdjustmentData.row.name}
+                    day={timeAdjustmentData.day}
+                    t={t}
+                />
+            )}
         </>
     );
 };
