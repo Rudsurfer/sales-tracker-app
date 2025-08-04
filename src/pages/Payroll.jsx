@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { doc, setDoc } from 'firebase/firestore';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { formatCurrency } from '../utils/helpers';
 import { TRANSACTION_TYPES } from '../constants';
+import { Download } from 'lucide-react';
+import Papa from 'papaparse';
 
-export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals, selectedStore, t }) => {
+export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals, selectedStore, currentWeek, currentYear, db, appId, setNotification, t }) => {
     const [payrollData, setPayrollData] = useState([]);
     const [saveState, setSaveState] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -228,6 +231,39 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
         return totals;
     }, [transfersInData]);
 
+    const handleExport = () => {
+        const mainData = payrollData.map(row => {
+            const newRow = {};
+            payrollColumns.forEach(col => {
+                newRow[t[col.field] || col.header] = row[col.field];
+            });
+            return newRow;
+        });
+
+        const transfersData = transfersInData.map(row => {
+            const newRow = {};
+            transfersInColumns.forEach(col => {
+                newRow[t[col.field] || col.header] = row[col.field];
+            });
+            return newRow;
+        });
+
+        const mainCsv = Papa.unparse(mainData);
+        const transfersCsv = Papa.unparse(transfersData);
+        
+        const csvString = `${t.payroll}\n${mainCsv}\n\n${t.transfersIn}\n${transfersCsv}`;
+
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `payroll_W${currentWeek}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-8">
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
@@ -245,7 +281,10 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
                             </div>
                         </div>
                     </div>
-                    <SaveButton onClick={handleSaveClick} saveState={saveState} text={t.savePayroll} />
+                    <div className="flex gap-4">
+                        <button onClick={handleExport} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2"/> {t.exportToCsv || 'Export to CSV'}</button>
+                        <SaveButton onClick={handleSaveClick} saveState={saveState} text={t.savePayroll} />
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-400 border-collapse">
