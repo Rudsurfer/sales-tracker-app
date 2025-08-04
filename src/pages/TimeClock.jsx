@@ -133,7 +133,7 @@ export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees 
 
     return (
         <div className="w-full h-screen bg-gray-900 flex flex-col items-center justify-center p-8">
-            <button onClick={onExit} className="absolute top-4 left-4 flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"><LogOut size={18} className="mr-2" /> {t.exit}</button>
+            <button onClick={onExit} className="absolute bottom-4 right-4 flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"><LogOut size={18} className="mr-2" /> {t.exit}</button>
             <h1 className="text-4xl font-bold text-white mb-2">{t.timeClock}</h1>
             <p className="text-lg text-gray-400 mb-8">{t.enterPin}</p>
             <div className="w-full max-w-xs">

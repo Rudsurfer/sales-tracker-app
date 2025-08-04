@@ -156,7 +156,7 @@ export default function App() {
 
     const handleNavClick = (page) => {
         if (page === 'Time Clock') {
-            handleChangeStore();
+            setView('timeClock');
             return;
         }
         if (page === 'Payroll' && !isPayrollUnlocked) {
@@ -219,7 +219,7 @@ export default function App() {
     
     if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees }} />;
     
-    if (view === 'timeClock') return <TimeClock onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees, currentWeek, currentYear }} />;
+    if (view === 'timeClock') return <TimeClock onExit={() => setView(selectedStore ? 'dashboard' : 'storeSelector')} {...{ t, db, appId, setNotification, allEmployees, currentWeek, currentYear }} />;
 
     return (
         <div className="flex h-screen bg-gray-900 text-white font-sans">
