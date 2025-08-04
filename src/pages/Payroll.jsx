@@ -5,6 +5,7 @@ import { formatCurrency } from '../utils/helpers';
 import { TRANSACTION_TYPES } from '../constants';
 import { Download } from 'lucide-react';
 import Papa from 'papaparse';
+import { translations } from '../translations';
 
 export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals, selectedStore, currentWeek, currentYear, db, appId, setNotification, t }) => {
     const [payrollData, setPayrollData] = useState([]);
@@ -232,10 +233,11 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
     }, [transfersInData]);
 
     const handleExport = () => {
+        const tEn = translations.en;
         const mainData = payrollData.map(row => {
             const newRow = {};
             payrollColumns.forEach(col => {
-                newRow[t[col.field] || col.header] = row[col.field];
+                newRow[tEn[col.field] || col.header] = row[col.field];
             });
             return newRow;
         });
@@ -243,7 +245,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
         const transfersData = transfersInData.map(row => {
             const newRow = {};
             transfersInColumns.forEach(col => {
-                newRow[t[col.field] || col.header] = row[col.field];
+                newRow[tEn[col.field] || col.header] = row[col.field];
             });
             return newRow;
         });
@@ -251,7 +253,7 @@ export const Payroll = ({ allSchedules, allSales, allEmployees, performanceGoals
         const mainCsv = Papa.unparse(mainData);
         const transfersCsv = Papa.unparse(transfersData);
         
-        const csvString = `${t.payroll}\n${mainCsv}\n\n${t.transfersIn}\n${transfersCsv}`;
+        const csvString = `${tEn.payroll}\n${mainCsv}\n\n${tEn.transfersIn}\n${transfersCsv}`;
 
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
