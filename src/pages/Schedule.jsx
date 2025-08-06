@@ -74,6 +74,52 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
     );
 };
 
+const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => {
+    const [clockIn, setClockIn] = useState('');
+    const [clockOut, setClockOut] = useState('');
+    const [reason, setReason] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleSave = () => {
+        if (!clockIn || !clockOut || !reason) {
+            alert(t.fillAllFields);
+            return;
+        }
+        onSave({ clockIn, clockOut, reason });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Time Adjustment for {employeeName} on {day}</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In Time (e.g., 9:00am)</label>
+                        <input type="text" value={clockIn} onChange={e => setClockIn(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out Time (e.g., 5:30pm)</label>
+                        <input type="text" value={clockOut} onChange={e => setClockOut(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Reason for Adjustment</label>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" rows="3"></textarea>
+                    </div>
+                </div>
+                <div className="flex justify-end mt-6 space-x-4">
+                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">{t.cancel}</button>
+                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.saveChanges}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t, language }) => {
     const [schedule, setSchedule] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +127,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [saveState, setSaveState] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
+    const [editingCell, setEditingCell] = useState(null);
+    const [timeAdjustmentData, setTimeAdjustmentData] = useState(null);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
     const fetchSchedule = async () => {
@@ -91,7 +139,6 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 const data = await response.json();
                 setSchedule(data);
             } else {
-                // If no schedule exists, create a new one in-memory
                 const storeEmployees = allEmployees.filter(emp => emp.AssociatedStore === selectedStore);
                 const newScheduleRows = storeEmployees.map(emp => ({
                     EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
@@ -109,16 +156,85 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     useEffect(() => {
         fetchSchedule();
     }, [selectedStore, currentWeek, currentYear, allEmployees]);
-
-    // ... (rest of the component logic remains the same)
     
+    const handleRowChange = (id, field, value, day) => {
+        const newRows = schedule.rows.map(row => {
+            if (row.EmployeeID === id) {
+                if (day) {
+                    const newFieldData = { ...row[field], [day]: value };
+                    return { ...row, [field]: newFieldData };
+                }
+                return { ...row, [field]: value };
+            }
+            return row;
+        });
+        setSchedule(prev => ({ ...prev, rows: newRows }));
+    };
+
+    const handleAddRow = () => {
+        const newRow = { EmployeeID: `new_${Date.now()}`, Name: '', PositionID: '', JobTitle: JOB_TITLES[0], objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} };
+        setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
+    };
+
+    const handleAddGuest = (employee) => {
+        const newRow = { 
+            EmployeeID: employee.EmployeeID, 
+            Name: employee.Name, 
+            PositionID: employee.PositionID, 
+            JobTitle: employee.JobTitle, 
+            objective: 0, 
+            shifts: {}, 
+            actualHours: {}, 
+            dailyObjectives: {},
+            isGuest: true,
+            homeStore: employee.AssociatedStore
+        };
+        setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
+    };
+
+    const handleRemoveRow = (id) => {
+        setSchedule(prev => ({...prev, rows: prev.rows.filter(row => row.EmployeeID !== id)}));
+    };
+
+    const executeSaveSchedule = async (lockWeek = false) => {
+        setSaveState('saving');
+        try {
+            await fetch(`${API_BASE_URL}/schedule`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    storeId: selectedStore,
+                    week: currentWeek,
+                    year: currentYear,
+                    isLocked: lockWeek || schedule.isLocked,
+                    rows: schedule.rows
+                })
+            });
+            setSaveState('saved');
+            setNotification({ message: t.scheduleSavedSuccess, type: 'success' });
+            setTimeout(() => setSaveState('idle'), 2000);
+        } catch (error) {
+            console.error("Error saving schedule:", error);
+            setNotification({ message: t.errorSavingSchedule, type: 'error' });
+            setSaveState('idle');
+        }
+        setIsConfirmModalOpen(false);
+    };
+    
+    const handleFinalizeWeek = () => setIsConfirmModalOpen(true);
+    const handleConfirmFinalize = () => {
+        executeSaveSchedule(true);
+        setSchedule(prev => ({...prev, isLocked: true}));
+        setIsConfirmModalOpen(false);
+    };
+
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
     return (
         <>
-            {/* ... (JSX remains the same) ... */}
+            {/* ... JSX for Schedule page ... */}
         </>
     );
 };
