@@ -144,11 +144,6 @@ export const Schedule = ({ schedule, currentWeek, currentYear, db, appId, select
         
         const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
         
-        const startOfWeek = new Date(currentYear, 0, 1 + (currentWeek - 1) * 7);
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(endOfWeek.getDate() + 7);
-
         const q = query(timeLogRef, 
             where("week", "==", currentWeek),
             where("year", "==", currentYear)
