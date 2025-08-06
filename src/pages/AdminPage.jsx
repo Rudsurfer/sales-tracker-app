@@ -98,7 +98,41 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
         }
     };
 
-    // ... (CSV handling functions remain the same for now)
+    const handleFileChange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    setImportData(results.data);
+                },
+                error: () => {
+                    setNotification({ message: t.importError, type: 'error' });
+                }
+            });
+        }
+    };
+    
+    const handleConfirmImport = async () => {
+        // This function will need to be updated to call the backend API
+        console.log("Importing data:", importData);
+        setImportData(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    const handleDownloadTemplate = () => {
+        const csv = "name,positionId,jobTitle,rate,baseSalary,associatedStore";
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "employee_template.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
@@ -111,7 +145,12 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
                 <button onClick={onExit} className="flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"><LogOut size={18} className="mr-2" /> {t.exit}</button>
             </header>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                {/* ... (UI for buttons remains the same) ... */}
+                <div className="flex justify-end mb-4 gap-4">
+                    <button onClick={handleDownloadTemplate} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2" /> {t.downloadTemplate}</button>
+                    <input type="file" ref={fileInputRef} accept=".csv" onChange={handleFileChange} className="hidden" id="csv-upload" />
+                    <label htmlFor="csv-upload" className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer"><Upload size={18} className="mr-2" /> {t.importFromCsv}</label>
+                    <SaveButton onClick={handleSaveClick} saveState={saveStatus} text={t.saveChanges} />
+                </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
@@ -140,10 +179,29 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
                         </tbody>
                     </table>
                 </div>
-                {/* ... (UI for Add New Employee form remains the same) ... */}
+                <div className="mt-8 border-t border-gray-700 pt-6">
+                    <h3 className="text-lg font-semibold mb-4">{t.addNewEmployee}</h3>
+                    <form onSubmit={handleAddEmployee} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <input type="text" name="name" placeholder={t.payrollName} value={newEmployee.name} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" required />
+                        <input type="text" name="positionId" placeholder={t.positionId} value={newEmployee.positionId} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" required />
+                        <select name="jobTitle" value={newEmployee.jobTitle} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">{JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}</select>
+                        <select name="associatedStore" value={newEmployee.associatedStore} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select>
+                        <input type="number" name="rate" placeholder={t.rate} value={newEmployee.rate} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                        <input type="number" name="baseSalary" placeholder={t.baseSalary} value={newEmployee.baseSalary} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                        <button type="submit" className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg col-span-full md:col-span-1 lg:col-span-2"><PlusCircle size={18} className="mr-2" /> {t.addEmployee}</button>
+                    </form>
+                </div>
             </div>
             <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleConfirmSave} title={t.confirmSave} t={t}><p>{t.confirmSaveEmployeeDb}</p></ConfirmationModal>
-            {/* ... (Confirmation Modal for CSV import remains the same) ... */}
+            <ConfirmationModal isOpen={!!importData} onClose={() => { setImportData(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} onConfirm={handleConfirmImport} title={t.importPreview} t={t}>
+                <div className="text-left max-h-60 overflow-y-auto">
+                    <p className="mb-2">Review the data below. Click confirm to update/add these employees.</p>
+                    <table className="w-full text-xs">
+                        <thead><tr className="bg-gray-700"><th className="p-1">Name</th><th className="p-1">Position ID</th><th className="p-1">Store</th></tr></thead>
+                        <tbody>{importData?.map((row, i) => (<tr key={i} className="border-b border-gray-700"><td className="p-1">{row.name}</td><td className="p-1">{row.positionId}</td><td className="p-1">{row.associatedStore}</td></tr>))}</tbody>
+                    </table>
+                </div>
+            </ConfirmationModal>
         </div>
     );
 };
