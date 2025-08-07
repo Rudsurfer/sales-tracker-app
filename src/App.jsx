@@ -26,7 +26,7 @@ import { TimeClock } from './pages/TimeClock';
 import { Building2 } from 'lucide-react';
 
 // IMPORTANT: Replace with your API server's DNS name.
-const API_BASE_URL = '\\rsmtl-plm:5000/api';
+const API_BASE_URL = 'http://rsmtl-plm:5000/api';
 
 let app, auth;
 try {
@@ -172,4 +172,3 @@ export default function App() {
         </div>
     );
 }
-
