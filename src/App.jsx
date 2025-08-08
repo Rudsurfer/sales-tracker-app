@@ -25,8 +25,8 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-// IMPORTANT: Replace with your API server's DNS name.
-const API_BASE_URL = 'http://rsmtl-plm:5000/api';
+// This is the address of your backend API server.
+const API_BASE_URL = 'https://vq_api.rudsak.com/api';
 
 let app, auth;
 try {
