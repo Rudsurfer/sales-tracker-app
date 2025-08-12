@@ -25,8 +25,7 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-// This is the address of your backend API server.
-const API_BASE_URL = 'https://vq_api.rudsak.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 let app, auth;
 try {
