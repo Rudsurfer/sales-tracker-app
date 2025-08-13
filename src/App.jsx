@@ -25,7 +25,7 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-const API_BASE_URL = 'https://vq_api.rudsak.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 let app, auth;
 try {
@@ -70,18 +70,19 @@ export default function App() {
         }
     }, [notification]);
 
+    const fetchEmployees = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/employees`);
+            const data = await response.json();
+            setAllEmployees(data);
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+        } finally {
+            setIsCoreDataLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchEmployees = async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/employees`);
-                const data = await response.json();
-                setAllEmployees(data);
-            } catch (error) {
-                console.error("Error fetching employees:", error);
-            } finally {
-                setIsCoreDataLoading(false);
-            }
-        };
         if (isAuthReady) {
             fetchEmployees();
         }
@@ -146,7 +147,7 @@ export default function App() {
         </>
     );
     
-    if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, setNotification, API_BASE_URL }} />;
+    if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, setNotification, API_BASE_URL, allEmployees, refreshEmployees: fetchEmployees }} />;
     
     if (view === 'timeClock') return <TimeClock onExit={() => setView(selectedStore ? 'dashboard' : 'storeSelector')} {...{ t, setNotification, allEmployees, API_BASE_URL }} />;
 

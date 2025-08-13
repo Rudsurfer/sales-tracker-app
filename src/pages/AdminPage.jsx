@@ -4,31 +4,17 @@ import { ALL_STORES, JOB_TITLES } from '../constants';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import Papa from 'papaparse';
 
-export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL }) => {
-    const [employees, setEmployees] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmployees, refreshEmployees }) => {
+    const [employees, setEmployees] = useState(allEmployees);
     const [newEmployee, setNewEmployee] = useState({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
     const [saveStatus, setSaveStatus] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [importData, setImportData] = useState(null);
     const fileInputRef = useRef(null);
 
-    const fetchEmployees = async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/employees`);
-            const data = await response.json();
-            setEmployees(data);
-        } catch (error) {
-            console.error("Error fetching employees:", error);
-            setNotification({ message: 'Failed to load employee data.', type: 'error' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchEmployees();
-    }, []);
+        setEmployees(allEmployees);
+    }, [allEmployees]);
 
     const handleNewEmployeeChange = (e) => {
         const { name, value } = e.target;
@@ -57,7 +43,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL }) => {
             });
             setNewEmployee({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
             setNotification({ message: t.employeeAddedSuccess, type: 'success' });
-            fetchEmployees();
+            refreshEmployees();
         } catch (error) {
             console.error("Error adding employee:", error);
             setNotification({ message: t.errorAddingEmployee, type: 'error' });
@@ -81,6 +67,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL }) => {
             await Promise.all(promises);
             setSaveStatus('saved');
             setTimeout(() => setSaveStatus('idle'), 2000);
+            refreshEmployees();
         } catch (error) {
             console.error("Error saving changes:", error);
             setNotification({ message: t.errorSavingChanges, type: 'error' });
@@ -95,7 +82,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL }) => {
         try {
             await fetch(`${API_BASE_URL}/employees/${id}`, { method: 'DELETE' });
             setNotification({ message: t.employeeDeleted, type: 'success' });
-            fetchEmployees();
+            refreshEmployees();
         } catch (error) {
             console.error("Error deleting employee:", error);
             setNotification({ message: t.errorDeletingEmployee, type: 'error' });
@@ -133,10 +120,6 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL }) => {
         link.click();
         document.body.removeChild(link);
     };
-
-    if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
-    }
 
     return (
         <div className="bg-gray-900 text-white min-h-screen p-8 font-sans">
