@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Award, Percent, DollarSign, Hash } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
 import { DAYS_OF_WEEK, TRANSACTION_TYPES, COLORS } from '../constants';
@@ -52,65 +52,35 @@ const KPIStatCard = ({ title, value, icon: Icon, color, valueColorClass = 'text-
     );
 };
 
-export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL }) => {
-    const [sales, setSales] = useState([]);
-    const [schedule, setSchedule] = useState({ rows: [] });
-    const [stcData, setStcData] = useState({ days: {} });
-    const [performanceGoals, setPerformanceGoals] = useState({});
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!selectedStore || !currentWeek || !currentYear) return;
-            setIsLoading(true);
-            try {
-                const [salesRes, scheduleRes, stcRes, goalsRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/stc/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`)
-                ]);
-                setSales(await salesRes.json());
-                setSchedule(await scheduleRes.json());
-                setStcData(await stcRes.json());
-                setPerformanceGoals(await goalsRes.json());
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
-
+export const Dashboard = ({ sales, performanceGoals, stcData, t, allSchedules, allSales, selectedStore, allEmployees }) => {
     const { netSales, avgTransactionValue, unitsPerTransaction, conversionRate, leaderboardData, categorySalesData, payrollPercentage, payrollPercentageColor } = useMemo(() => {
-        let totalNetSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
+        let totalNetSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
         
         const employeeSalesMap = new Map();
         const categoryTotals = {};
 
         sales.forEach(sale => {
-            if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD || sale.Type_ === TRANSACTION_TYPES.RETURN) return;
+            if (sale.type === TRANSACTION_TYPES.GIFT_CARD || sale.type === TRANSACTION_TYPES.RETURN) return;
             (sale.items || []).forEach(item => {
-                const rep = item.SalesRep;
-                 const itemValue = item.Subtotal;
+                const rep = item.salesRep;
+                 const itemValue = item.total || (item.price * item.quantity);
                 if(rep) {
                     employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
                 }
-                if (!categoryTotals[item.Category]) categoryTotals[item.Category] = 0;
-                categoryTotals[item.Category] += itemValue;
+                if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
+                categoryTotals[item.category] += itemValue;
             });
         });
         
-        const merchandiseSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
+        const merchandiseSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
         const totalTransactions = merchandiseSales.length;
-        const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
+        const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
         
-        const totalTraffic = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
+        const totalTraffic = Object.values(stcData.days || {}).reduce((daySum, dayData) => {
             return daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0);
         }, 0);
         
-        const totalSTCTransactions = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
+        const totalSTCTransactions = Object.values(stcData.days || {}).reduce((daySum, dayData) => {
             return daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0);
         }, 0);
 
@@ -125,22 +95,25 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             .sort((a,b) => b.value - a.value);
             
         let totalCostForPercentage = 0;
-        const homeStoreEmployees = allEmployees.filter(e => e.AssociatedStore === selectedStore);
+        const homeStoreEmployees = allEmployees.filter(e => e.associatedStore === selectedStore);
 
         homeStoreEmployees.forEach(emp => {
             let totalHours = 0;
-            const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
-            if (scheduleRow) {
-                totalHours = Object.values(scheduleRow.ActualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-            }
 
-            if (emp.BaseSalary > 0) {
-                 const effectiveHourlyRate = (emp.BaseSalary / 52) / 40;
+            allSchedules.forEach(sched => {
+                const row = sched.rows.find(r => r.id === emp.id);
+                if (row) {
+                    totalHours += Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                }
+            });
+
+            if (emp.baseSalary > 0) {
+                 const effectiveHourlyRate = (emp.baseSalary / 52) / 40;
                  totalCostForPercentage += (effectiveHourlyRate * totalHours);
             } else {
                 const regularHours = Math.min(totalHours, 40);
                 const otHours = Math.max(0, totalHours - 40);
-                const gross = (emp.Rate * regularHours) + (emp.Rate * 1.5 * otHours);
+                const gross = (emp.rate * regularHours) + (emp.rate * 1.5 * otHours);
                 totalCostForPercentage += gross;
             }
         });
@@ -160,23 +133,19 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             payrollPercentage: percentage,
             payrollPercentageColor: colorClass
         };
-    }, [sales, stcData, schedule, allEmployees, selectedStore, t]);
+    }, [sales, stcData, allSchedules, allSales, selectedStore, allEmployees]);
     
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
-    const dailyTarget = performanceGoals.DailyGoals?.[todayString.toLowerCase()] || 0;
-    const dailyActual = sales.filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
+    const dailyTarget = performanceGoals.daily?.[todayString.toLowerCase()] || 0;
+    const dailyActual = sales.filter(s => s.day === todayString && s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
     const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
 
-    const weeklyTarget = performanceGoals.WeeklySalesTarget || 0;
+    const weeklyTarget = performanceGoals.weeklySalesTarget || 0;
     const weeklyPercent = weeklyTarget > 0 ? (netSales / weeklyTarget) * 100 : 0;
-
-    if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
-    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <GoalProgressCard title={t.todaysGoal} actual={dailyActual} target={dailyTarget} percent={dailyPercent} />
                 <GoalProgressCard title={t.weeklyGoal} actual={netSales} target={weeklyTarget} percent={weeklyPercent} />
                 <KPIStatCard title={t.conversionRate} value={`${conversionRate.toFixed(2)}%`} icon={Percent} color="purple" />

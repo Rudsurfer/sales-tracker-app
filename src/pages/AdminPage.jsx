@@ -4,10 +4,7 @@ import { ALL_STORES, JOB_TITLES } from '../constants';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import Papa from 'papaparse';
 
-// Define the base URL for your new backend API
-const API_BASE_URL = 'http://localhost:5000/api';
-
-export const AdminPage = ({ onExit, t, setNotification }) => {
+export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL }) => {
     const [employees, setEmployees] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [newEmployee, setNewEmployee] = useState({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
@@ -16,7 +13,6 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
     const [importData, setImportData] = useState(null);
     const fileInputRef = useRef(null);
 
-    // Fetch employees from the new backend API
     const fetchEmployees = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/employees`);
@@ -46,14 +42,22 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
             return;
         }
         try {
+            const newEmployeeData = {
+                Name: newEmployee.name,
+                PositionID: newEmployee.positionId,
+                JobTitle: newEmployee.jobTitle,
+                Rate: Number(newEmployee.rate),
+                BaseSalary: Number(newEmployee.baseSalary),
+                StoreID: newEmployee.associatedStore
+            };
             await fetch(`${API_BASE_URL}/employees`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newEmployee, Rate: Number(newEmployee.rate), BaseSalary: Number(newEmployee.baseSalary), StoreID: newEmployee.associatedStore, Name: newEmployee.name, PositionID: newEmployee.positionId, JobTitle: newEmployee.jobTitle })
+                body: JSON.stringify(newEmployeeData)
             });
             setNewEmployee({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
             setNotification({ message: t.employeeAddedSuccess, type: 'success' });
-            fetchEmployees(); // Refresh the list
+            fetchEmployees();
         } catch (error) {
             console.error("Error adding employee:", error);
             setNotification({ message: t.errorAddingEmployee, type: 'error' });
@@ -91,7 +95,7 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
         try {
             await fetch(`${API_BASE_URL}/employees/${id}`, { method: 'DELETE' });
             setNotification({ message: t.employeeDeleted, type: 'success' });
-            fetchEmployees(); // Refresh the list
+            fetchEmployees();
         } catch (error) {
             console.error("Error deleting employee:", error);
             setNotification({ message: t.errorDeletingEmployee, type: 'error' });
@@ -104,12 +108,8 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
-                complete: (results) => {
-                    setImportData(results.data);
-                },
-                error: () => {
-                    setNotification({ message: t.importError, type: 'error' });
-                }
+                complete: (results) => setImportData(results.data),
+                error: () => setNotification({ message: t.importError, type: 'error' })
             });
         }
     };
@@ -145,7 +145,7 @@ export const AdminPage = ({ onExit, t, setNotification }) => {
                 <button onClick={onExit} className="flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"><LogOut size={18} className="mr-2" /> {t.exit}</button>
             </header>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="flex justify-end mb-4 gap-4">
+                 <div className="flex justify-end mb-4 gap-4">
                     <button onClick={handleDownloadTemplate} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2" /> {t.downloadTemplate}</button>
                     <input type="file" ref={fileInputRef} accept=".csv" onChange={handleFileChange} className="hidden" id="csv-upload" />
                     <label htmlFor="csv-upload" className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer"><Upload size={18} className="mr-2" /> {t.importFromCsv}</label>

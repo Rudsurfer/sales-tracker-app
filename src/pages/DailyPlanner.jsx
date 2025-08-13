@@ -1,49 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { SaveButton, ConfirmationModal } from '../components/ui';
+import { doc, setDoc } from 'firebase/firestore';
 import { PlusCircle, Trash2 } from 'lucide-react';
+import { SaveButton } from '../components/ui';
 
-export const DailyPlanner = ({ selectedStore, currentDate, API_BASE_URL, setNotification, t, allEmployees }) => {
-    const [planner, setPlanner] = useState({ notes: '', priorities: [], tasks: [] });
-    const [isLoading, setIsLoading] = useState(true);
+export const DailyPlanner = ({ dailyPlanner, schedule, db, appId, selectedStore, currentDate, setNotification, t }) => {
+    const [plannerData, setPlannerData] = useState({ notes: '', priorities: [], tasks: [] });
     const [saveState, setSaveState] = useState('idle');
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [newPriority, setNewPriority] = useState('');
-    const [newTask, setNewTask] = useState({ description: '', assignedTo: '' });
-
-    const dateString = currentDate.toISOString().split('T')[0];
 
     useEffect(() => {
-        const fetchPlanner = async () => {
-            setIsLoading(true);
-            try {
-                const response = await fetch(`${API_BASE_URL}/planners/${selectedStore}/${dateString}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setPlanner(data);
-                } else {
-                    setPlanner({ notes: '', priorities: [], tasks: [] });
-                }
-            } catch (error) {
-                console.error("Error fetching planner:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchPlanner();
-    }, [selectedStore, dateString, API_BASE_URL]);
+        if (dailyPlanner) {
+            setPlannerData({
+                notes: dailyPlanner.notes || '',
+                priorities: dailyPlanner.priorities || [],
+                tasks: dailyPlanner.tasks || [],
+            });
+        }
+    }, [dailyPlanner]);
+
+    const handlePlannerChange = (field, value) => {
+        setPlannerData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handlePriorityChange = (id, field, value) => {
+        const newPriorities = plannerData.priorities.map(p => p.id === id ? { ...p, [field]: value } : p);
+        handlePlannerChange('priorities', newPriorities);
+    };
+
+    const handleTaskChange = (id, field, value) => {
+        const newTasks = plannerData.tasks.map(t => t.id === id ? { ...t, [field]: value } : t);
+        handlePlannerChange('tasks', newTasks);
+    };
+
+    const addPriority = () => {
+        const newPriority = { id: crypto.randomUUID(), text: '', completed: false };
+        handlePlannerChange('priorities', [...plannerData.priorities, newPriority]);
+    };
+
+    const addTask = () => {
+        const newTask = { id: crypto.randomUUID(), text: '', assignedTo: '', completed: false };
+        handlePlannerChange('tasks', [...plannerData.tasks, newTask]);
+    };
+
+    const deletePriority = (id) => {
+        handlePlannerChange('priorities', plannerData.priorities.filter(p => p.id !== id));
+    };
+
+    const deleteTask = (id) => {
+        handlePlannerChange('tasks', plannerData.tasks.filter(t => t.id !== id));
+    };
 
     const handleSave = async () => {
+        if (!db) return;
         setSaveState('saving');
+        const plannerDocId = `${selectedStore}-${currentDate.toISOString().split('T')[0]}`;
+        const docRef = doc(db, `artifacts/${appId}/public/data/planners`, plannerDocId);
         try {
-            await fetch(`${API_BASE_URL}/planners`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    storeId: selectedStore,
-                    date: dateString,
-                    ...planner
-                })
-            });
+            await setDoc(docRef, plannerData, { merge: true });
             setSaveState('saved');
             setNotification({ message: t.plannerSaved, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
@@ -52,87 +64,61 @@ export const DailyPlanner = ({ selectedStore, currentDate, API_BASE_URL, setNoti
             setNotification({ message: t.errorSavingPlanner, type: 'error' });
             setSaveState('idle');
         }
-        setIsConfirmModalOpen(false);
-    };
-    
-    const handleAddPriority = () => {
-        if (newPriority.trim()) {
-            setPlanner(p => ({ ...p, priorities: [...p.priorities, newPriority] }));
-            setNewPriority('');
-        }
     };
 
-    const handleRemovePriority = (index) => {
-        setPlanner(p => ({ ...p, priorities: p.priorities.filter((_, i) => i !== index) }));
-    };
-
-    const handleAddTask = () => {
-        if (newTask.description.trim()) {
-            setPlanner(p => ({ ...p, tasks: [...p.tasks, newTask] }));
-            setNewTask({ description: '', assignedTo: '' });
-        }
-    };
-
-    const handleRemoveTask = (index) => {
-        setPlanner(p => ({ ...p, tasks: p.tasks.filter((_, i) => i !== index) }));
-    };
-
-    if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
-    }
+    const employeesOnShift = schedule?.rows?.filter(r => r.name) || [];
 
     return (
-        <div className="space-y-6">
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">{t.plannerForDate.replace('{date}', new Date(dateString).toLocaleDateString())}</h2>
-                <SaveButton onClick={() => setIsConfirmModalOpen(true)} saveState={saveState} text={t.savePlanner} />
+                <h2 className="text-2xl font-bold text-white">{t.plannerForDate.replace('{date}', currentDate.toLocaleDateString())}</h2>
+                <SaveButton onClick={handleSave} saveState={saveState} text={t.savePlanner} />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h3 className="text-xl font-bold mb-4 text-white">{t.dailyNotes}</h3>
-                    <textarea value={planner.notes} onChange={e => setPlanner(p => ({...p, notes: e.target.value}))} placeholder={t.generalNotesPlaceholder} className="w-full h-64 bg-gray-900 border border-gray-600 rounded-md p-3"></textarea>
+
+            <div className="bg-gray-900/50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2 text-gray-200">{t.dailyNotes}</h3>
+                <textarea
+                    value={plannerData.notes}
+                    onChange={(e) => handlePlannerChange('notes', e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white"
+                    rows="4"
+                    placeholder={t.generalNotesPlaceholder}
+                />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-gray-900/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2 text-gray-200">{t.topPriorities}</h3>
+                    <div className="space-y-2">
+                        {plannerData.priorities.map(p => (
+                            <div key={p.id} className="flex items-center gap-2">
+                                <input type="checkbox" checked={p.completed} onChange={(e) => handlePriorityChange(p.id, 'completed', e.target.checked)} className="h-5 w-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-600"/>
+                                <input type="text" value={p.text} onChange={(e) => handlePriorityChange(p.id, 'text', e.target.value)} className={`flex-grow bg-transparent outline-none p-1 rounded ${p.completed ? 'line-through text-gray-500' : 'text-white'}`} />
+                                <button onClick={() => deletePriority(p.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16} /></button>
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={addPriority} className="mt-2 flex items-center text-sm text-blue-400 hover:text-blue-300"><PlusCircle size={16} className="mr-1" /> {t.addPriority}</button>
                 </div>
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                        <h3 className="text-xl font-bold mb-4 text-white">{t.topPriorities}</h3>
-                        <div className="space-y-2">
-                            {planner.priorities.map((p, i) => (
-                                <div key={i} className="flex items-center justify-between bg-gray-700/50 p-2 rounded-md">
-                                    <span>{p}</span>
-                                    <button onClick={() => handleRemovePriority(i)} className="text-red-500 hover:text-red-400"><Trash2 size={16}/></button>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex mt-4 gap-2">
-                            <input type="text" value={newPriority} onChange={e => setNewPriority(e.target.value)} placeholder="New priority..." className="flex-grow bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
-                            <button onClick={handleAddPriority} className="bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-lg"><PlusCircle size={20}/></button>
-                        </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2 text-gray-200">{t.taskList}</h3>
+                    <div className="space-y-2">
+                        {plannerData.tasks.map(t => (
+                            <div key={t.id} className="flex items-center gap-2">
+                                <input type="checkbox" checked={t.completed} onChange={(e) => handleTaskChange(t.id, 'completed', e.target.checked)} className="h-5 w-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-600"/>
+                                <input type="text" value={t.text} onChange={(e) => handleTaskChange(t.id, 'text', e.target.value)} className={`w-1/2 bg-transparent outline-none p-1 rounded ${t.completed ? 'line-through text-gray-500' : 'text-white'}`} placeholder={t.taskDescriptionPlaceholder}/>
+                                <select value={t.assignedTo} onChange={(e) => handleTaskChange(t.id, 'assignedTo', e.target.value)} className="bg-gray-800 border border-gray-600 rounded-md px-2 py-1 text-sm">
+                                    <option value="">{t.unassigned}</option>
+                                    {employeesOnShift.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                                </select>
+                                <button onClick={() => deleteTask(t.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16} /></button>
+                            </div>
+                        ))}
                     </div>
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                        <h3 className="text-xl font-bold mb-4 text-white">{t.taskList}</h3>
-                        <div className="space-y-2">
-                            {planner.tasks.map((task, i) => (
-                                <div key={i} className="flex items-center justify-between bg-gray-700/50 p-2 rounded-md">
-                                    <span>{task.description}</span>
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-xs bg-gray-600 px-2 py-1 rounded-full">{task.assignedTo || t.unassigned}</span>
-                                        <button onClick={() => handleRemoveTask(i)} className="text-red-500 hover:text-red-400"><Trash2 size={16}/></button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                         <div className="flex mt-4 gap-2">
-                            <input type="text" value={newTask.description} onChange={e => setNewTask(t => ({...t, description: e.target.value}))} placeholder={t.taskDescriptionPlaceholder} className="flex-grow bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
-                            <select value={newTask.assignedTo} onChange={e => setNewTask(t => ({...t, assignedTo: e.target.value}))} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">
-                                <option value="">{t.unassigned}</option>
-                                {allEmployees.filter(e => e.AssociatedStore === selectedStore).map(emp => <option key={emp.EmployeeID} value={emp.Name}>{emp.Name}</option>)}
-                            </select>
-                            <button onClick={handleAddTask} className="bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-lg"><PlusCircle size={20}/></button>
-                        </div>
-                    </div>
+                    <button onClick={addTask} className="mt-2 flex items-center text-sm text-blue-400 hover:text-blue-300"><PlusCircle size={16} className="mr-1" /> {t.addTask}</button>
                 </div>
             </div>
-            <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleSave} title={t.confirmSave} t={t}><p>{t.plannerForDate.replace('{date}', new Date(dateString).toLocaleDateString())}</p></ConfirmationModal>
         </div>
     );
 };

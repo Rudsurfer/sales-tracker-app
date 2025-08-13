@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { Clock, LogOut } from 'lucide-react';
 import { getWeekNumber } from '../utils/helpers';
 
-export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_URL }) => {
+export const TimeClock = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
     const [pin, setPin] = useState('');
     const [employee, setEmployee] = useState(null);
     const [activeLog, setActiveLog] = useState(null);
@@ -34,24 +35,22 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
     const handleDelete = () => setPin(pin.slice(0, -1));
 
     const findOpenLog = async (employeeId) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/timelog/open/${employeeId}`);
-            if (response.ok) {
-                return await response.json();
-            }
-            return null;
-        } catch (error) {
-            console.error("Error finding open log:", error);
-            return null;
+        const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
+        const q = query(timeLogRef, where("employeeId", "==", employeeId), where("clockOut", "==", null), limit(1));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const doc = querySnapshot.docs[0];
+            return { id: doc.id, ...doc.data() };
         }
+        return null;
     };
 
     const handlePinSubmit = async () => {
         if (pin.length === 0 || isProcessing) return;
         setIsProcessing(true);
-        const foundEmployee = allEmployees.find(e => e.PositionID === pin);
+        const foundEmployee = allEmployees.find(e => e.positionId === pin);
         if (foundEmployee) {
-            const openLog = await findOpenLog(foundEmployee.EmployeeID);
+            const openLog = await findOpenLog(foundEmployee.id);
             setActiveLog(openLog);
             setEmployee(foundEmployee);
             setMessage('');
@@ -67,18 +66,17 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
         setIsProcessing(true);
         try {
             const now = new Date();
-            await fetch(`${API_BASE_URL}/timelog/clock-in`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    employeeId: employee.EmployeeID,
-                    storeId: employee.AssociatedStore,
-                    week: getWeekNumber(now),
-                    year: now.getFullYear(),
-                })
-            });
-            const openLog = await findOpenLog(employee.EmployeeID);
-            setActiveLog(openLog);
+            const timeLogRef = collection(db, `artifacts/${appId}/public/data/time_logs`);
+            const newLog = {
+                employeeId: employee.id,
+                storeId: employee.associatedStore,
+                clockIn: serverTimestamp(),
+                clockOut: null,
+                week: getWeekNumber(now),
+                year: now.getFullYear(),
+            };
+            const docRef = await addDoc(timeLogRef, newLog);
+            setActiveLog({ id: docRef.id, ...newLog, clockIn: new Date() });
             setNotification({ message: t.clockInSuccess, type: 'success' });
         } catch (error) {
             console.error("Error clocking in:", error);
@@ -91,9 +89,8 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
         if (!activeLog || isProcessing) return;
         setIsProcessing(true);
         try {
-            await fetch(`${API_BASE_URL}/timelog/clock-out/${activeLog.TimeLogID}`, {
-                method: 'PUT'
-            });
+            const docRef = doc(db, `artifacts/${appId}/public/data/time_logs`, activeLog.id);
+            await updateDoc(docRef, { clockOut: serverTimestamp() });
             setActiveLog(null);
             setNotification({ message: t.clockOutSuccess, type: 'success' });
         } catch (error) {
@@ -117,7 +114,7 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
         return (
             <div className="w-full h-screen bg-gray-900 flex flex-col items-center justify-center p-8">
                 <h1 className="text-4xl font-bold text-white mb-2">{t.timeClock}</h1>
-                <p className="text-2xl text-gray-300 mb-4">{employee.Name}</p>
+                <p className="text-2xl text-gray-300 mb-4">{employee.name}</p>
                 <div className="flex items-center gap-2 mb-8 p-2 bg-gray-800 rounded-lg">
                     <span className={`w-4 h-4 rounded-full ${statusColor}`}></span>
                     <span className="text-white">{statusText}</span>
