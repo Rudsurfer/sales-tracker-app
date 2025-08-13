@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getDocs, getDoc, collection, query, where, doc } from 'firebase/firestore';
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
 import { RefreshCw } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
@@ -45,63 +44,67 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
     );
 };
 
-
-export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, currentYear, currentWeek, t }) => {
+export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_URL }) => {
+    const [sales, setSales] = useState([]);
+    const [schedule, setSchedule] = useState({ rows: [] });
     const [historicalData, setHistoricalData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const fetchHistoricalData = async () => {
-            if (!db || !selectedStore) return;
+        const fetchData = async () => {
             setIsLoading(true);
-            const data = [];
-            const weeksToFetch = 8;
-            const basePath = `artifacts/${appId}/public/data`;
-
-            for (let i = 0; i < weeksToFetch; i++) {
-                let week = currentWeek - i;
-                let year = currentYear;
-                if (week <= 0) {
-                    year = currentYear - 1;
-                    week = 52 + week;
-                }
-
-                const salesQuery = query(collection(db, `${basePath}/sales`), where("storeId", "==", selectedStore), where("week", "==", week), where("year", "==", year));
-                const scheduleDocRef = doc(db, `${basePath}/schedules`, `${selectedStore}-${year}-W${week}`);
-                const stcDocRef = doc(db, `${basePath}/stc`, `${selectedStore}-${year}-W${week}`);
-
-                const [salesSnapshot, scheduleDoc, stcDoc] = await Promise.all([
-                    getDocs(salesQuery),
-                    getDoc(scheduleDocRef),
-                    getDoc(stcDocRef)
+            try {
+                const [salesRes, scheduleRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`),
+                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`)
                 ]);
+                setSales(await salesRes.json());
+                setSchedule(await scheduleRes.json());
 
-                const weeklySales = salesSnapshot.docs.map(d => d.data());
-                const weeklySchedule = scheduleDoc.exists() ? scheduleDoc.data() : { rows: [] };
-                const weeklyStc = stcDoc.exists() ? stcDoc.data() : { days: {} };
+                const historyPromises = [];
+                for (let i = 0; i < 8; i++) {
+                    let week = currentWeek - i;
+                    let year = currentYear;
+                    if (week <= 0) { year--; week = 52 + week; }
+                    historyPromises.push(
+                        fetch(`${API_BASE_URL}/sales/${selectedStore}/${week}/${year}`).then(res => res.json()),
+                        fetch(`${API_BASE_URL}/schedule/${selectedStore}/${week}/${year}`).then(res => res.json()),
+                        fetch(`${API_BASE_URL}/stc/${selectedStore}/${week}/${year}`).then(res => res.json())
+                    );
+                }
+                const historyResults = await Promise.all(historyPromises);
+                const formattedHistory = [];
+                for (let i = 0; i < historyResults.length; i += 3) {
+                    formattedHistory.push({
+                        week: currentWeek - (i/3),
+                        sales: historyResults[i],
+                        schedule: historyResults[i+1],
+                        stc: historyResults[i+2]
+                    });
+                }
+                setHistoricalData(formattedHistory.reverse());
 
-                data.push({ week, year, sales: weeklySales, schedule: weeklySchedule, stc: weeklyStc });
+            } catch (error) {
+                console.error("Error fetching report data:", error);
+            } finally {
+                setIsLoading(false);
             }
-
-            setHistoricalData(data.reverse()); // Oldest to newest
-            setIsLoading(false);
         };
-
-        fetchHistoricalData();
-    }, [db, selectedStore, currentWeek, currentYear, appId]);
+        fetchData();
+    }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
     const trendData = useMemo(() => {
         return historicalData.map(weeklyData => {
             const { sales, schedule, stc } = weeklyData;
             
-            const merchandiseSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
-            const netSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
+            const merchandiseSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
+            const netSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
             const totalTransactions = merchandiseSales.length;
-            const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
+            const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
             
-            const totalTraffic = Object.values(stc.days || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0), 0);
-            const totalSTCTransactions = Object.values(stc.days || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0), 0);
-            const totalHours = (schedule.rows || []).reduce((sum, row) => sum + Object.values(row.actualHours || {}).reduce((hSum, h) => hSum + Number(h), 0), 0);
+            const totalTraffic = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0), 0);
+            const totalSTCTransactions = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0), 0);
+            const totalHours = (schedule.rows || []).reduce((sum, row) => sum + Object.values(row.ActualHours || {}).reduce((hSum, h) => hSum + Number(h), 0), 0);
 
             return {
                 name: `W${weeklyData.week}`,
@@ -115,42 +118,39 @@ export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, curr
     }, [historicalData]);
 
     const currentWeekMetrics = useMemo(() => {
-        const sales = allSales.filter(s => s.storeId === selectedStore);
-        const schedule = allSchedules.find(s => s.id === `${selectedStore}-${currentYear}-W${currentWeek}`) || { rows: [] };
-        
-        const merchandiseSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD && s.type !== TRANSACTION_TYPES.RETURN);
-        const returns = sales.filter(s => s.type === TRANSACTION_TYPES.RETURN);
-        const giftCardSalesData = sales.filter(s => s.type === TRANSACTION_TYPES.GIFT_CARD);
+        const merchandiseSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
+        const returns = sales.filter(s => s.Type_ === TRANSACTION_TYPES.RETURN);
+        const giftCardSalesData = sales.filter(s => s.Type_ === TRANSACTION_TYPES.GIFT_CARD);
 
         const totalTransactions = merchandiseSales.length;
-        const totalReturnValue = returns.reduce((sum, s) => sum + s.total, 0);
-        const netSales = sales.filter(s => s.type !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.total, 0);
+        const totalReturnValue = returns.reduce((sum, s) => sum + s.TotalAmount, 0);
+        const netSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
 
         const totalQuantity = merchandiseSales.reduce((sum, sale) => {
-            return sum + (sale.items || []).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 0), 0);
+            return sum + (sale.items || []).reduce((itemSum, item) => itemSum + (Number(item.Quantity) || 0), 0);
         }, 0);
 
         const categoryTotals = {};
         sales.forEach(sale => {
-            if (sale.type === TRANSACTION_TYPES.RETURN || sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
+            if (sale.Type_ === TRANSACTION_TYPES.RETURN || sale.Type_ === TRANSACTION_TYPES.GIFT_CARD) return;
             (sale.items || []).forEach(item => {
-                const itemValue = item.total || (item.price * item.quantity);
-                if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
-                categoryTotals[item.category] += itemValue;
+                const itemValue = item.Subtotal;
+                if (!categoryTotals[item.Category]) categoryTotals[item.Category] = 0;
+                categoryTotals[item.Category] += itemValue;
             });
         });
         const categoryData = Object.entries(categoryTotals).map(([name, value]) => ({ name: t[name] || name, value })).filter(d => d.value > 0);
 
         const employeeAnalysis = new Map();
 
-        (schedule.rows || []).filter(row => row.name).forEach(row => {
-            employeeAnalysis.set(row.name, {
-                name: row.name,
+        (schedule.rows || []).filter(row => row.Name).forEach(row => {
+            employeeAnalysis.set(row.Name, {
+                name: row.Name,
                 objective: row.objective || 0,
                 totalSales: 0,
                 numTransactions: 0,
                 unitsSold: 0,
-                hoursWorked: Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0),
+                hoursWorked: Object.values(row.ActualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0),
                 categoryUnits: SALE_CATEGORIES.reduce((acc, cat) => ({ ...acc, [cat]: 0 }), {})
             });
         });
@@ -158,24 +158,24 @@ export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, curr
         const transactionSellers = new Map();
 
         sales.forEach(sale => {
-            if (sale.type === TRANSACTION_TYPES.GIFT_CARD) return;
+            if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD) return;
             
             (sale.items || []).forEach(item => {
-                const rep = item.salesRep;
-                const itemValue = item.total || (item.price * item.quantity);
+                const rep = item.SalesRep;
+                const itemValue = item.Subtotal;
 
                 if (employeeAnalysis.has(rep)) {
                     const emp = employeeAnalysis.get(rep);
                     emp.totalSales += itemValue;
                     
-                    if (sale.type !== TRANSACTION_TYPES.RETURN) {
-                        emp.unitsSold += item.quantity;
-                        emp.categoryUnits[item.category] += item.quantity;
+                    if (sale.Type_ !== TRANSACTION_TYPES.RETURN) {
+                        emp.unitsSold += item.Quantity;
+                        emp.categoryUnits[item.Category] += item.Quantity;
                         
-                        if (!transactionSellers.has(sale.id)) {
-                            transactionSellers.set(sale.id, new Set());
+                        if (!transactionSellers.has(sale.SaleID)) {
+                            transactionSellers.set(sale.SaleID, new Set());
                         }
-                        transactionSellers.get(sale.id).add(rep);
+                        transactionSellers.get(sale.SaleID).add(rep);
                     }
                 }
             });
@@ -203,11 +203,11 @@ export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, curr
             totalReturns: totalReturnValue,
             avgTransactionValue: totalTransactions > 0 ? netSales / totalTransactions : 0,
             unitsPerTransaction: totalTransactions > 0 ? totalQuantity / totalTransactions : 0,
-            giftCardSales: giftCardSalesData.reduce((sum, s) => sum + s.total, 0),
+            giftCardSales: giftCardSalesData.reduce((sum, s) => sum + s.TotalAmount, 0),
             categoryData,
             weeklySellersAnalysis
         };
-    }, [allSales, allSchedules, selectedStore, currentWeek, currentYear, t]);
+    }, [sales, schedule, t]);
 
     const analysisTotals = useMemo(() => {
         const totals = {
@@ -229,6 +229,10 @@ export const Reports = ({ allSales, allSchedules, db, appId, selectedStore, curr
         totals.unitsPerTransaction = totals.numTransactions > 0 ? totals.unitsSold / totals.numTransactions : 0;
         return totals;
     }, [currentWeekMetrics.weeklySellersAnalysis]);
+
+    if (isLoading) {
+        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
+    }
 
     return (
         <div className="space-y-8">

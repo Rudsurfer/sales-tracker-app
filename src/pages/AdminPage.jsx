@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, doc, writeBatch, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { Users, LogOut, PlusCircle, Trash2, Upload, Download } from 'lucide-react';
 import { ALL_STORES, JOB_TITLES } from '../constants';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import Papa from 'papaparse';
 
-export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees }) => {
+export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmployees, refreshEmployees }) => {
     const [employees, setEmployees] = useState(allEmployees);
     const [newEmployee, setNewEmployee] = useState({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
     const [saveStatus, setSaveStatus] = useState('idle');
@@ -16,7 +15,7 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
     useEffect(() => {
         setEmployees(allEmployees);
     }, [allEmployees]);
-    
+
     const handleNewEmployeeChange = (e) => {
         const { name, value } = e.target;
         setNewEmployee(prev => ({ ...prev, [name]: value }));
@@ -24,15 +23,27 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
 
     const handleAddEmployee = async (e) => {
         e.preventDefault();
-        if (!db || !newEmployee.name || !newEmployee.positionId) {
+        if (!newEmployee.name || !newEmployee.positionId) {
             setNotification({ message: t.fillAllFields, type: 'error' });
             return;
         }
         try {
-            const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
-            await addDoc(employeesCollectionRef, { ...newEmployee, rate: Number(newEmployee.rate), baseSalary: Number(newEmployee.baseSalary) });
+            const newEmployeeData = {
+                Name: newEmployee.name,
+                PositionID: newEmployee.positionId,
+                JobTitle: newEmployee.jobTitle,
+                Rate: Number(newEmployee.rate),
+                BaseSalary: Number(newEmployee.baseSalary),
+                StoreID: newEmployee.associatedStore
+            };
+            await fetch(`${API_BASE_URL}/employees`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEmployeeData)
+            });
             setNewEmployee({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
             setNotification({ message: t.employeeAddedSuccess, type: 'success' });
+            refreshEmployees();
         } catch (error) {
             console.error("Error adding employee:", error);
             setNotification({ message: t.errorAddingEmployee, type: 'error' });
@@ -40,22 +51,23 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
     };
 
     const handleEmployeeChange = (id, field, value) => {
-        setEmployees(current => current.map(emp => (emp.id === id ? { ...emp, [field]: value } : emp)));
+        setEmployees(current => current.map(emp => (emp.EmployeeID === id ? { ...emp, [field]: value } : emp)));
     };
 
     const executeSaveChanges = async () => {
-        if (!db) return;
         setSaveStatus('saving');
-        const batch = writeBatch(db);
-        employees.forEach(emp => {
-            const docRef = doc(db, `artifacts/${appId}/public/data/employees`, emp.id);
-            const { id, ...data } = emp;
-            batch.set(docRef, data, { merge: true });
-        });
         try {
-            await batch.commit();
+            const promises = employees.map(emp =>
+                fetch(`${API_BASE_URL}/employees/${emp.EmployeeID}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ PositionID: emp.PositionID, Name: emp.Name, JobTitle: emp.JobTitle, Rate: emp.Rate, BaseSalary: emp.BaseSalary, StoreID: emp.AssociatedStore })
+                })
+            );
+            await Promise.all(promises);
             setSaveStatus('saved');
             setTimeout(() => setSaveStatus('idle'), 2000);
+            refreshEmployees();
         } catch (error) {
             console.error("Error saving changes:", error);
             setNotification({ message: t.errorSavingChanges, type: 'error' });
@@ -65,11 +77,12 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
 
     const handleSaveClick = () => setIsConfirmModalOpen(true);
     const handleConfirmSave = () => { setIsConfirmModalOpen(false); executeSaveChanges(); };
+    
     const handleDeleteEmployee = async (id) => {
-        if (!db) return;
         try {
-            await deleteDoc(doc(db, `artifacts/${appId}/public/data/employees`, id));
+            await fetch(`${API_BASE_URL}/employees/${id}`, { method: 'DELETE' });
             setNotification({ message: t.employeeDeleted, type: 'success' });
+            refreshEmployees();
         } catch (error) {
             console.error("Error deleting employee:", error);
             setNotification({ message: t.errorDeletingEmployee, type: 'error' });
@@ -82,52 +95,17 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
-                complete: (results) => {
-                    setImportData(results.data);
-                },
-                error: () => {
-                    setNotification({ message: t.importError, type: 'error' });
-                }
+                complete: (results) => setImportData(results.data),
+                error: () => setNotification({ message: t.importError, type: 'error' })
             });
         }
     };
     
     const handleConfirmImport = async () => {
-        if (!importData) return;
-        const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
-        const batch = writeBatch(db);
-
-        for (const record of importData) {
-            const q = query(employeesCollectionRef, where("positionId", "==", record.positionId));
-            const querySnapshot = await getDocs(q);
-            const employeeData = {
-                name: record.name,
-                positionId: record.positionId,
-                jobTitle: record.jobTitle,
-                rate: Number(record.rate) || 0,
-                baseSalary: Number(record.baseSalary) || 0,
-                associatedStore: record.associatedStore,
-            };
-
-            if (!querySnapshot.empty) {
-                const docId = querySnapshot.docs[0].id;
-                const docRef = doc(db, `artifacts/${appId}/public/data/employees`, docId);
-                batch.update(docRef, employeeData);
-            } else {
-                const newDocRef = doc(employeesCollectionRef);
-                batch.set(newDocRef, employeeData);
-            }
-        }
-
-        try {
-            await batch.commit();
-            setNotification({ message: t.importSuccess, type: 'success' });
-        } catch (error) {
-             setNotification({ message: t.importError, type: 'error' });
-        } finally {
-            setImportData(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-        }
+        // This function will need to be updated to call the backend API
+        console.log("Importing data:", importData);
+        setImportData(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     const handleDownloadTemplate = () => {
@@ -150,7 +128,7 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
                 <button onClick={onExit} className="flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"><LogOut size={18} className="mr-2" /> {t.exit}</button>
             </header>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="flex justify-end mb-4 gap-4">
+                 <div className="flex justify-end mb-4 gap-4">
                     <button onClick={handleDownloadTemplate} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2" /> {t.downloadTemplate}</button>
                     <input type="file" ref={fileInputRef} accept=".csv" onChange={handleFileChange} className="hidden" id="csv-upload" />
                     <label htmlFor="csv-upload" className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer"><Upload size={18} className="mr-2" /> {t.importFromCsv}</label>
@@ -171,14 +149,14 @@ export const AdminPage = ({ onExit, t, db, appId, setNotification, allEmployees 
                         </thead>
                         <tbody>
                             {employees.map(emp => (
-                                <tr key={emp.id} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/50">
-                                    <td className="px-4 py-2"><input type="text" value={emp.name} onChange={e => handleEmployeeChange(emp.id, 'name', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
-                                    <td className="px-4 py-2"><input type="text" value={emp.positionId} onChange={e => handleEmployeeChange(emp.id, 'positionId', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
-                                    <td className="px-4 py-2"><select value={emp.jobTitle} onChange={e => handleEmployeeChange(emp.id, 'jobTitle', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}</select></td>
-                                    <td className="px-4 py-2"><input type="number" value={emp.rate} onChange={e => handleEmployeeChange(emp.id, 'rate', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
-                                    <td className="px-4 py-2"><input type="number" value={emp.baseSalary} onChange={e => handleEmployeeChange(emp.id, 'baseSalary', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
-                                    <td className="px-4 py-2"><select value={emp.associatedStore} onChange={e => handleEmployeeChange(emp.id, 'associatedStore', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select></td>
-                                    <td className="px-4 py-2"><button onClick={() => handleDeleteEmployee(emp.id)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button></td>
+                                <tr key={emp.EmployeeID} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/50">
+                                    <td className="px-4 py-2"><input type="text" value={emp.Name} onChange={e => handleEmployeeChange(emp.EmployeeID, 'Name', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
+                                    <td className="px-4 py-2"><input type="text" value={emp.PositionID} onChange={e => handleEmployeeChange(emp.EmployeeID, 'PositionID', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
+                                    <td className="px-4 py-2"><select value={emp.JobTitle} onChange={e => handleEmployeeChange(emp.EmployeeID, 'JobTitle', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}</select></td>
+                                    <td className="px-4 py-2"><input type="number" value={emp.Rate} onChange={e => handleEmployeeChange(emp.EmployeeID, 'Rate', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
+                                    <td className="px-4 py-2"><input type="number" value={emp.BaseSalary} onChange={e => handleEmployeeChange(emp.EmployeeID, 'BaseSalary', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
+                                    <td className="px-4 py-2"><select value={emp.AssociatedStore} onChange={e => handleEmployeeChange(emp.EmployeeID, 'AssociatedStore', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select></td>
+                                    <td className="px-4 py-2"><button onClick={() => handleDeleteEmployee(emp.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button></td>
                                 </tr>
                             ))}
                         </tbody>
