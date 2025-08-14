@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, query, where } from 'firebase/firestore';
 
-import { firebaseConfig, appId } from './firebaseConfig';
+import { firebaseConfig } from './firebaseConfig';
 import { translations } from './translations';
 import { ALL_STORES } from './constants'; 
 import { getWeekNumber } from './utils/helpers';
@@ -26,11 +25,12 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-let app, auth, db;
+const API_BASE_URL = 'https://vq_api.rudsak.com/api';
+
+let app, auth;
 try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
-    db = getFirestore(app);
 } catch (error) {
     console.error("Error initializing Firebase:", error);
 }
@@ -44,21 +44,11 @@ export default function App() {
     const [language, setLanguage] = useState(navigator.language.startsWith('fr') ? 'fr' : 'en');
     
     const [allEmployees, setAllEmployees] = useState([]);
-    const [allSchedules, setAllSchedules] = useState([]);
-    const [allSales, setAllSales] = useState([]);
     const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
-
-    const [sales, setSales] = useState([]);
-    const [schedule, setSchedule] = useState(null); // Initialize as null
-    const [stcData, setStcData] = useState({ days: {} });
-    const [performanceGoals, setPerformanceGoals] = useState({});
-    const [payroll, setPayroll] = useState({});
-    const [dailyPlanner, setDailyPlanner] = useState(null);
     
     const [notification, setNotification] = useState(null);
     const [isPayrollUnlocked, setIsPayrollUnlocked] = useState(false);
     const [passcodeChallenge, setPasscodeChallenge] = useState(null);
-    const [isLoadingStoreData, setIsLoadingStoreData] = useState(false);
 
     const t = translations[language];
     const currentWeek = useMemo(() => getWeekNumber(currentDate), [currentDate]);
@@ -80,79 +70,23 @@ export default function App() {
         }
     }, [notification]);
 
-    useEffect(() => {
-        if (!isAuthReady || !db) return;
-        setIsCoreDataLoading(true);
-        const unsubEmployees = onSnapshot(collection(db, `artifacts/${appId}/public/data/employees`), (snap) => {
-            setAllEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-        
-        const qSchedules = query(collection(db, `artifacts/${appId}/public/data/schedules`), where("week", "==", currentWeek), where("year", "==", currentYear));
-        const unsubSchedules = onSnapshot(qSchedules, (snap) => {
-            setAllSchedules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const fetchEmployees = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/employees`);
+            const data = await response.json();
+            setAllEmployees(data);
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+        } finally {
             setIsCoreDataLoading(false);
-        });
-
-        const qSales = query(collection(db, `artifacts/${appId}/public/data/sales`), where("week", "==", currentWeek), where("year", "==", currentYear));
-        const unsubSales = onSnapshot(qSales, (snap) => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-        return () => { unsubEmployees(); unsubSchedules(); unsubSales(); };
-    }, [isAuthReady, db, currentWeek, currentYear]);
-    
-    useEffect(() => {
-        if (!selectedStore || isCoreDataLoading) {
-            if (!selectedStore) setSchedule(null);
-            return;
         }
-        
-        const currentStoreSchedule = allSchedules.find(s => s.id === `${selectedStore}-${currentYear}-W${currentWeek}`);
-        const storeEmployees = allEmployees.filter(emp => emp.associatedStore === selectedStore);
-
-        if (currentStoreSchedule) {
-            const updatedRows = [...currentStoreSchedule.rows];
-            const scheduleEmployeeIds = new Set(updatedRows.map(r => r.employeeId));
-            
-            storeEmployees.forEach(emp => {
-                if (!scheduleEmployeeIds.has(emp.positionId)) {
-                    updatedRows.push({ id: emp.id, name: emp.name, employeeId: emp.positionId, jobTitle: emp.jobTitle, objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {} });
-                }
-            });
-
-            const finalRows = updatedRows.map(row => {
-                const empData = allEmployees.find(e => e.id === row.id);
-                if (empData && empData.associatedStore === selectedStore) {
-                    return { ...row, name: empData.name, jobTitle: empData.jobTitle };
-                }
-                if (empData && empData.associatedStore !== selectedStore) {
-                    return row;
-                }
-                if (!empData) return null;
-                return row;
-            }).filter(Boolean);
-            setSchedule({ ...currentStoreSchedule, rows: finalRows });
-        } else {
-            const newScheduleRows = storeEmployees.map(emp => ({ id: emp.id, name: emp.name, employeeId: emp.positionId, jobTitle: emp.jobTitle, objective: 0, shifts: {}, scheduledHours: {}, actualHours: {}, dailyObjectives: {} }));
-            setSchedule({ rows: newScheduleRows, week: currentWeek, year: currentYear, id: `${selectedStore}-${currentYear}-W${currentWeek}` });
-        }
-
-    }, [selectedStore, allSchedules, allEmployees, currentWeek, currentYear, isCoreDataLoading]);
-
+    };
 
     useEffect(() => {
-        if (!isAuthReady || !db || !selectedStore) return;
-        
-        setIsLoadingStoreData(true);
-        setSales(allSales.filter(s => s.storeId === selectedStore));
-
-        const unsubStc = onSnapshot(doc(db, `artifacts/${appId}/public/data/stc`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setStcData(doc.exists() ? doc.data() : { days: {} }));
-        const unsubGoals = onSnapshot(doc(db, `artifacts/${appId}/public/data/performance_goals`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPerformanceGoals(doc.exists() ? doc.data() : {}));
-        const unsubPayroll = onSnapshot(doc(db, `artifacts/${appId}/public/data/payrolls`, `${selectedStore}-${currentYear}-W${currentWeek}`), (doc) => setPayroll(doc.exists() ? doc.data() : {}));
-        const unsubPlanner = onSnapshot(doc(db, `artifacts/${appId}/public/data/planners`, `${selectedStore}-${currentDate.toISOString().split('T')[0]}`), (doc) => setDailyPlanner(doc.exists() ? { id: doc.id, ...doc.data() } : null));
-        
-        setIsLoadingStoreData(false);
-
-        return () => { unsubStc(); unsubGoals(); unsubPayroll(); unsubPlanner(); };
-    }, [isAuthReady, db, selectedStore, currentWeek, currentYear, currentDate, allSales]);
+        if (isAuthReady) {
+            fetchEmployees();
+        }
+    }, [isAuthReady]);
 
     const handleNavClick = (page) => {
         if (page === 'Time Clock') {
@@ -174,7 +108,6 @@ export default function App() {
             setIsPayrollUnlocked(true);
             setCurrentPage('Payroll');
         } else if (passcodeChallenge?.type === 'store') {
-            setIsLoadingStoreData(true);
             setSelectedStore(passcodeChallenge.id);
             setView('dashboard');
             setIsPayrollUnlocked(false);
@@ -191,10 +124,7 @@ export default function App() {
     };
 
     const renderPage = () => {
-        if (isCoreDataLoading || isLoadingStoreData) {
-             return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
-        }
-        const props = { db, appId, t, language, setNotification, selectedStore, currentWeek, currentYear, currentDate, allEmployees, allSchedules, allSales, sales, schedule, stcData, performanceGoals, payroll, dailyPlanner };
+        const props = { t, language, setNotification, selectedStore, currentWeek, currentYear, currentDate, allEmployees, API_BASE_URL };
         switch (currentPage) {
             case 'Dashboard': return <Dashboard {...props} />;
             case 'Performance Goals': return <PerformanceGoals {...props} />;
@@ -208,7 +138,7 @@ export default function App() {
         }
     };
 
-    if (!isAuthReady) return <div className="flex items-center justify-center h-screen bg-gray-900 text-white"><div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div></div>;
+    if (!isAuthReady || isCoreDataLoading) return <div className="flex items-center justify-center h-screen bg-gray-900 text-white"><div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div></div>;
 
     if (view === 'storeSelector') return (
         <>
@@ -217,9 +147,9 @@ export default function App() {
         </>
     );
     
-    if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, db, appId, setNotification, allEmployees }} />;
+    if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, setNotification, API_BASE_URL, allEmployees, refreshEmployees: fetchEmployees }} />;
     
-    if (view === 'timeClock') return <TimeClock onExit={() => setView(selectedStore ? 'dashboard' : 'storeSelector')} {...{ t, db, appId, setNotification, allEmployees, currentWeek, currentYear }} />;
+    if (view === 'timeClock') return <TimeClock onExit={() => setView(selectedStore ? 'dashboard' : 'storeSelector')} {...{ t, setNotification, allEmployees, API_BASE_URL }} />;
 
     return (
         <div className="flex h-screen bg-gray-900 text-white font-sans">
