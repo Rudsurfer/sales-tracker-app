@@ -135,31 +135,19 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         setIsLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`);
-            let scheduleData;
-            if (response.ok) {
-                scheduleData = await response.json();
-            } else {
+            const data = await response.json();
+
+            // **This is the key change. We check the status from the backend.**
+            if (data.status === 'not_found') {
                 const storeEmployees = allEmployees.filter(emp => emp.AssociatedStore === selectedStore);
                 const newScheduleRows = storeEmployees.map(emp => ({
                     EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
                     objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
                 }));
-                scheduleData = { rows: newScheduleRows, isLocked: false };
+                setSchedule({ rows: newScheduleRows, isLocked: false });
+            } else {
+                setSchedule(data);
             }
-            
-            const storeEmployees = allEmployees.filter(emp => emp.AssociatedStore === selectedStore);
-            const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
-            storeEmployees.forEach(emp => {
-                if (!scheduleEmployeeIds.has(emp.EmployeeID)) {
-                    scheduleData.rows.push({
-                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
-                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
-                    });
-                }
-            });
-
-            setSchedule(scheduleData);
-
         } catch (error) {
             console.error("Error fetching schedule:", error);
         } finally {
