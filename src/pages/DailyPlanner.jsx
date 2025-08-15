@@ -54,7 +54,7 @@ export const DailyPlanner = ({ selectedStore, currentDate, API_BASE_URL, setNoti
         }
         setIsConfirmModalOpen(false);
     };
-    
+
     const handleAddPriority = () => {
         if (newPriority.trim()) {
             setPlanner(p => ({ ...p, priorities: [...p.priorities, newPriority] }));
