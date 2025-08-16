@@ -138,6 +138,14 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             let scheduleData;
             if (response.ok) {
                 scheduleData = await response.json();
+                 if (scheduleData.status === 'not_found') {
+                    const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+                    const newScheduleRows = storeEmployees.map(emp => ({
+                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                    }));
+                    scheduleData = { rows: newScheduleRows, isLocked: false };
+                }
             } else {
                 const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
                 const newScheduleRows = storeEmployees.map(emp => ({
