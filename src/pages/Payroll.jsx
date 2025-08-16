@@ -17,13 +17,15 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
         const fetchPayrollData = async () => {
             setIsLoading(true);
             try {
-                const [scheduleRes, salesRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`)
+                const [scheduleRes, salesRes, goalsRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
                 ]);
-                const schedule = await scheduleRes.json();
-                const sales = await salesRes.json();
 
+                const schedule = scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes;
+                const sales = salesRes.status === 'not_found' ? [] : salesRes;
+                
                 const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
                 
                 const calculatedPayroll = homeStoreEmployees.map(emp => {
@@ -82,6 +84,7 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
         };
         fetchPayrollData();
     }, [selectedStore, currentWeek, currentYear, allEmployees, API_BASE_URL]);
+
 
     // ... (handlePayrollChange, totals calculation, and other logic remains the same)
 
