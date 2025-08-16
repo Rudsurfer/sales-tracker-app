@@ -70,15 +70,16 @@ export default function App() {
         }
     }, [notification]);
 
-    // **This function will now be passed to the Admin Page to refresh the employee list.**
     const fetchEmployees = async () => {
         setIsCoreDataLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/employees`);
+            if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
             setAllEmployees(data);
         } catch (error) {
             console.error("Error fetching employees:", error);
+            setNotification({ message: 'Failed to load employee data.', type: 'error' });
         } finally {
             setIsCoreDataLoading(false);
         }
@@ -149,7 +150,6 @@ export default function App() {
         </>
     );
     
-    // **Passing the `refreshEmployees` function to the AdminPage component.**
     if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, setNotification, API_BASE_URL, allEmployees, refreshEmployees: fetchEmployees }} />;
     
     if (view === 'timeClock') return <TimeClock onExit={() => setView(selectedStore ? 'dashboard' : 'storeSelector')} {...{ t, setNotification, allEmployees, API_BASE_URL }} />;
