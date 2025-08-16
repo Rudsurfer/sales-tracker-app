@@ -63,7 +63,7 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
                         <div key={emp.EmployeeID} className="flex justify-between items-center p-2 hover:bg-gray-700 rounded">
                             <div>
                                 <p className="font-bold">{emp.Name}</p>
-                                <p className="text-sm text-gray-400">{emp.JobTitle} - {t.homeStore}: {emp.AssociatedStore}</p>
+                                <p className="text-sm text-gray-400">{emp.JobTitle} - {t.homeStore}: {emp.StoreID}</p>
                             </div>
                             <button onClick={() => { onAdd(emp); onClose(); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-sm">{t.addEmployee}</button>
                         </div>
@@ -135,19 +135,31 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         setIsLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`);
-            const data = await response.json();
-
-            // **This is the key change. We check the status from the backend.**
-            if (data.status === 'not_found') {
-                const storeEmployees = allEmployees.filter(emp => emp.AssociatedStore === selectedStore);
+            let scheduleData;
+            if (response.ok) {
+                scheduleData = await response.json();
+            } else {
+                const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
                 const newScheduleRows = storeEmployees.map(emp => ({
                     EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
                     objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
                 }));
-                setSchedule({ rows: newScheduleRows, isLocked: false });
-            } else {
-                setSchedule(data);
+                scheduleData = { rows: newScheduleRows, isLocked: false };
             }
+            
+            const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+            const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
+            storeEmployees.forEach(emp => {
+                if (!scheduleEmployeeIds.has(emp.EmployeeID)) {
+                    scheduleData.rows.push({
+                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                    });
+                }
+            });
+
+            setSchedule(scheduleData);
+
         } catch (error) {
             console.error("Error fetching schedule:", error);
         } finally {
@@ -189,7 +201,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             actualHours: {}, 
             dailyObjectives: {},
             isGuest: true,
-            homeStore: employee.AssociatedStore
+            homeStore: employee.StoreID
         };
         setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
     };
