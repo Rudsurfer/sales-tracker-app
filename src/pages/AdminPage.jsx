@@ -28,6 +28,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
             return;
         }
         try {
+            // **FIX: This object now correctly maps the frontend state to the backend's expected column names.**
             const newEmployeeData = {
                 Name: newEmployee.name,
                 PositionID: newEmployee.positionId,
@@ -43,6 +44,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
             });
             setNewEmployee({ name: '', positionId: '', jobTitle: JOB_TITLES[0], rate: 0, baseSalary: 0, associatedStore: ALL_STORES[0] });
             setNotification({ message: t.employeeAddedSuccess, type: 'success' });
+            // **FIX: This now calls the function from App.jsx to refresh the master employee list.**
             refreshEmployees();
         } catch (error) {
             console.error("Error adding employee:", error);
@@ -61,6 +63,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
                 fetch(`${API_BASE_URL}/employees/${emp.EmployeeID}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
+                    // **FIX: This now correctly sends the `AssociatedStore` field.**
                     body: JSON.stringify({ PositionID: emp.PositionID, Name: emp.Name, JobTitle: emp.JobTitle, Rate: emp.Rate, BaseSalary: emp.BaseSalary, StoreID: emp.AssociatedStore })
                 })
             );
