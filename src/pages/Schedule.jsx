@@ -4,8 +4,6 @@ import { SaveButton, ConfirmationModal } from '../components/ui';
 import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 // Helper function to convert decimal hours to HHh MMm format
 const decimalHoursToHM = (decimalHours) => {
@@ -336,6 +334,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     };
 
     const handleGeneratePdf = () => {
+        const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.text(`${t.schedule} - ${t.store} ${selectedStore} - ${t.currentWeek} ${currentWeek}, ${currentYear}`, 14, 15);
 
