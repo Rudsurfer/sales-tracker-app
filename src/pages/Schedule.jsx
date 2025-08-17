@@ -341,13 +341,33 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         <>
             <style>{`
                 @media print {
-                    body * { visibility: hidden; }
-                    #printable-schedule, #printable-schedule * { visibility: visible; }
-                    #printable-schedule { position: absolute; left: 0; top: 0; width: 100%; }
-                    .no-print { display: none; }
+                    body, #root, .flex.h-screen {
+                        visibility: hidden;
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+                    .flex-1.overflow-y-auto {
+                        overflow: visible !important;
+                    }
+                    #printable-schedule, #printable-schedule * {
+                        visibility: visible;
+                    }
+                    #printable-schedule {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        height: auto;
+                        overflow: visible;
+                        box-shadow: none;
+                        border: none;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
                 }
             `}</style>
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div id="printable-schedule" className="bg-gray-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-end mb-4 gap-4 no-print">
                     <button onClick={() => window.print()} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
                         <Printer size={18} className="mr-2"/> {t.printSchedule}
@@ -363,7 +383,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     )}
                     <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
                 </div>
-                <div id="printable-schedule" className="overflow-x-auto">
+                <div className="overflow-x-auto">
                     <h2 className="text-xl font-bold mb-4 print-only">{t.schedule} - {t.store} {selectedStore} - {t.currentWeek} {currentWeek}, {currentYear}</h2>
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
