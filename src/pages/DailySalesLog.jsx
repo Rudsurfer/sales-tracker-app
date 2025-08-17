@@ -13,10 +13,15 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
         setIsLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`);
-            const data = await response.json();
-            setSales(data);
+            if (response.ok) {
+                const data = await response.json();
+                setSales(data);
+            } else {
+                setSales([]);
+            }
         } catch (error) {
             console.error("Error fetching sales:", error);
+            setSales([]);
         } finally {
             setIsLoading(false);
         }
