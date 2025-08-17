@@ -12,24 +12,28 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
-    useEffect(() => {
-        const fetchGoals = async () => {
-            setIsLoading(true);
-            try {
-                const response = await fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setGoals({
-                        daily: data.DailyGoals || {},
-                        kpi: data.KpiTargets || { dph: 0, dpt: 0, upt: 0 }
-                    });
-                }
-            } catch (error) {
-                console.error("Error fetching goals:", error);
-            } finally {
-                setIsLoading(false);
+    const fetchGoals = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`);
+            if (response.ok) {
+                const data = await response.json();
+                setGoals({
+                    daily: JSON.parse(data.DailyGoals || '{}'),
+                    kpi: JSON.parse(data.KpiTargets || '{"dph":0,"dpt":0,"upt":0}')
+                });
+            } else {
+                 setGoals({ daily: {}, kpi: { dph: 0, dpt: 0, upt: 0 } });
             }
-        };
+        } catch (error) {
+            console.error("Error fetching goals:", error);
+            setGoals({ daily: {}, kpi: { dph: 0, dpt: 0, upt: 0 } });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchGoals();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
@@ -62,6 +66,7 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
             setSaveState('saved');
             setNotification({ message: t.goalsSavedSuccess, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
+            fetchGoals(); // Re-fetch data after saving
         } catch (error) {
             console.error("Error saving goals:", error);
             setNotification({ message: t.errorSavingGoals, type: 'error' });
