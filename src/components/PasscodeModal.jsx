@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 export const PasscodeModal = ({ onSuccess, onClose, t, API_BASE_URL, isManagerCheck = false, correctPasscode }) => {
     const [passcode, setPasscode] = useState('');
     const [error, setError] = useState('');
 
-    const handleInput = (num) => {
-        if (passcode.length < 6) {
-            setPasscode(passcode + num);
-        }
-    };
+    const handleInput = useCallback((num) => {
+        setPasscode(prev => {
+            if (prev.length < 6) {
+                return prev + num;
+            }
+            return prev;
+        });
+    }, []);
 
-    const handleDelete = () => {
-        setPasscode(passcode.slice(0, -1));
-    };
+    const handleDelete = useCallback(() => {
+        setPasscode(prev => prev.slice(0, -1));
+    }, []);
 
-    const handleSubmit = async () => {
+    const handleSubmit = useCallback(async () => {
         if (isManagerCheck) {
             try {
                 const response = await fetch(`${API_BASE_URL}/timelog/verify-manager`, {
@@ -40,7 +43,24 @@ export const PasscodeModal = ({ onSuccess, onClose, t, API_BASE_URL, isManagerCh
                 setPasscode('');
             }
         }
-    };
+    }, [passcode, isManagerCheck, API_BASE_URL, correctPasscode, onSuccess, t]);
+
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key >= '0' && event.key <= '9') {
+                handleInput(event.key);
+            } else if (event.key === 'Backspace') {
+                handleDelete();
+            } else if (event.key === 'Enter') {
+                handleSubmit();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [handleInput, handleDelete, handleSubmit]);
 
     return (
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
@@ -53,10 +73,10 @@ export const PasscodeModal = ({ onSuccess, onClose, t, API_BASE_URL, isManagerCh
                 {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
                 <div className="grid grid-cols-3 gap-4 mb-4">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                        <button key={num} onClick={() => handleInput(num)} className="bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl p-4 rounded-lg">{num}</button>
+                        <button key={num} onClick={() => handleInput(num.toString())} className="bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl p-4 rounded-lg">{num}</button>
                     ))}
                     <div />
-                    <button onClick={() => handleInput(0)} className="bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl p-4 rounded-lg">0</button>
+                    <button onClick={() => handleInput('0')} className="bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl p-4 rounded-lg">0</button>
                     <button onClick={handleDelete} className="bg-gray-600 hover:bg-gray-500 text-white font-bold p-4 rounded-lg">⌫</button>
                 </div>
                 <button onClick={handleSubmit} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-xl">{t.unlock}</button>
