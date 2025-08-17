@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PlusCircle, Trash2, Target, X, UserPlus, Printer, Lock, Unlock, Edit2 } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
+import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
@@ -138,6 +139,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
     const [editingCell, setEditingCell] = useState(null);
     const [timeAdjustmentData, setTimeAdjustmentData] = useState(null);
+    const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
     const fetchSchedule = async () => {
@@ -324,6 +326,12 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             setNotification({ message: "Error saving adjustment.", type: 'error' });
         }
     };
+    
+    const handleManagerPasscodeSuccess = () => {
+        setIsManagerPasscodeOpen(false);
+        // Now open the time adjustment modal
+        // This assumes timeAdjustmentData is already set with the row and day info
+    };
 
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
@@ -418,7 +426,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                                 {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
                                                             </div>
                                                         )}
-                                                        {!schedule.isLocked && !isEditing && <button onClick={() => setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]})} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
+                                                        {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
                                                     </div>
                                                 </div>
                                             </td>
@@ -465,6 +473,15 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             >
                 <p>{t.confirmLockWeek}</p>
             </ConfirmationModal>
+            {isManagerPasscodeOpen && (
+                <PasscodeModal 
+                    onSuccess={handleManagerPasscodeSuccess} 
+                    onClose={() => setIsManagerPasscodeOpen(false)} 
+                    t={t} 
+                    API_BASE_URL={API_BASE_URL}
+                    isManagerCheck={true}
+                />
+            )}
             {timeAdjustmentData && (
                 <TimeAdjustmentModal 
                     isOpen={!!timeAdjustmentData}
