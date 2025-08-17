@@ -341,29 +341,29 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         <>
             <style>{`
                 @media print {
-                    body, #root, .flex.h-screen {
+                    /* Hide everything on the page by default */
+                    body * {
                         visibility: hidden;
-                        height: auto !important;
-                        overflow: visible !important;
                     }
-                    .flex-1.overflow-y-auto {
-                        overflow: visible !important;
-                    }
+                    /* Make the printable container and its children visible */
                     #printable-schedule, #printable-schedule * {
                         visibility: visible;
                     }
+                    /* Position the printable container at the top of the page */
                     #printable-schedule {
                         position: absolute;
                         left: 0;
                         top: 0;
                         width: 100%;
-                        height: auto;
-                        overflow: visible;
-                        box-shadow: none;
-                        border: none;
                     }
+                    /* Hide elements that should not be printed */
                     .no-print {
                         display: none !important;
+                    }
+                    /* Override layout constraints on parent elements */
+                    body, #root, .flex.h-screen, main, .flex-1.overflow-y-auto {
+                        height: auto !important;
+                        overflow: visible !important;
                     }
                 }
             `}</style>
