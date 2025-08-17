@@ -4,6 +4,15 @@ import { SaveButton, ConfirmationModal } from '../components/ui';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
+// Helper function to convert decimal hours to HHh MMm format
+const decimalHoursToHM = (decimalHours) => {
+    if (!decimalHours || decimalHours <= 0) return "0h 0m";
+    const totalMinutes = Math.round(decimalHours * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h ${minutes}m`;
+};
+
 const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
     return (
@@ -391,24 +400,31 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                     <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
                                                     <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
                                                     <div className="relative">
-                                                        <input 
-                                                            type="number" 
-                                                            placeholder={t.actual} 
-                                                            value={isEditing ? row.actualHours?.[dayKey] : (row.actualHours?.[dayKey] || 0).toFixed(2)} 
-                                                            readOnly={!isEditing || schedule.isLocked}
-                                                            onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
-                                                            onBlur={() => setEditingCell(null)}
-                                                            onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
-                                                            className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`} 
-                                                            step="0.25" 
-                                                        />
-                                                        {!schedule.isLocked && <button onClick={() => setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]})} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
+                                                        {isEditing ? (
+                                                            <input 
+                                                                type="number" 
+                                                                value={row.actualHours?.[dayKey] || ''} 
+                                                                onBlur={() => setEditingCell(null)}
+                                                                onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
+                                                                autoFocus
+                                                                className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} 
+                                                                step="0.25" 
+                                                            />
+                                                        ) : (
+                                                            <div 
+                                                                onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
+                                                                className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
+                                                            >
+                                                                {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
+                                                            </div>
+                                                        )}
+                                                        {!schedule.isLocked && !isEditing && <button onClick={() => setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]})} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
                                                     </div>
                                                 </div>
                                             </td>
                                         )})}
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{totalScheduledHours.toFixed(2)}</td>
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{totalActualHours.toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalScheduledHours)}</td>
+                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
                                         <td className="px-4 py-2 text-center no-print">
                                             <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
                                         </td>

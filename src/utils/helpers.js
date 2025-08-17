@@ -6,8 +6,8 @@ export const formatCurrency = (value) => {
     return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 };
 
-// UPDATED FISCAL WEEK CALCULATION
 export const getWeekNumber = (d) => {
+    // Fiscal year definition based on user feedback: Week 1 of 2025 starts on Sunday, Feb 2, 2025.
     const fiscalYearStart = new Date(Date.UTC(2025, 1, 2)); // Month is 0-indexed, so 1 is February.
 
     const date = new Date(d.valueOf());
@@ -64,6 +64,9 @@ export const parseShift = (shift) => {
 
     let duration = endTime - startTime;
     if (duration < 0) duration += 24;
-    if (duration > 5) duration -= 1;
+    
+    // **This line has been changed to deduct 30 minutes (0.5 hours) for lunch.**
+    if (duration > 5) duration -= 0.5;
+    
     return duration > 0 ? duration : 0;
 };
