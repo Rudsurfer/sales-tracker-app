@@ -17,11 +17,11 @@ const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
                     {weekDays.map((day, index) => (
                         <div key={day}>
                             <label className="block text-sm font-medium text-gray-300 mb-1">{day}</label>
-                            <input 
-                                type="number" 
-                                value={row.dailyObjectives?.[DAYS_OF_WEEK[index].toLowerCase()] || ''} 
-                                onChange={e => onRowChange(row.EmployeeID, 'dailyObjectives', e.target.value, DAYS_OF_WEEK[index].toLowerCase())} 
-                                className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" 
+                            <input
+                                type="number"
+                                value={row.dailyObjectives?.[DAYS_OF_WEEK[index].toLowerCase()] || ''}
+                                onChange={e => onRowChange(row.EmployeeID, 'dailyObjectives', e.target.value, DAYS_OF_WEEK[index].toLowerCase())}
+                                className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
                             />
                         </div>
                     ))}
@@ -39,8 +39,8 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
     if (!isOpen) return null;
 
     const currentEmployeeIds = new Set(currentScheduleRows.map(r => r.EmployeeID));
-    const filteredEmployees = allEmployees.filter(emp => 
-        !currentEmployeeIds.has(emp.EmployeeID) && 
+    const filteredEmployees = allEmployees.filter(emp =>
+        !currentEmployeeIds.has(emp.EmployeeID) &&
         emp.Name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -51,8 +51,8 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
                     <h3 className="text-xl font-bold text-white">{t.addGuestEmployee}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
                 </div>
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     placeholder={t.searchEmployee}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
