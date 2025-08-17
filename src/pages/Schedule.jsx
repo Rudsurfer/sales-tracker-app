@@ -4,6 +4,8 @@ import { SaveButton, ConfirmationModal } from '../components/ui';
 import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // Helper function to convert decimal hours to HHh MMm format
 const decimalHoursToHM = (decimalHours) => {
@@ -333,43 +335,40 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         // This assumes timeAdjustmentData is already set with the row and day info
     };
 
+    const handleGeneratePdf = () => {
+        const doc = new jsPDF();
+        doc.text(`${t.schedule} - ${t.store} ${selectedStore} - ${t.currentWeek} ${currentWeek}, ${currentYear}`, 14, 15);
+
+        const tableColumn = ["Employee Name", ...DAYS_OF_WEEK, "Total Hours"];
+        const tableRows = [];
+
+        schedule.rows.forEach(row => {
+            const rowData = [
+                row.Name,
+                ...DAYS_OF_WEEK.map(day => row.shifts[day.toLowerCase()] || 'OFF'),
+                decimalHoursToHM(Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0))
+            ];
+            tableRows.push(rowData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 20,
+        });
+
+        doc.save(`schedule_W${currentWeek}.pdf`);
+    };
+
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
     return (
         <>
-            <style>{`
-                @media print {
-                    /* Hide everything on the page by default */
-                    body * {
-                        visibility: hidden;
-                    }
-                    /* Make the printable container and its children visible */
-                    #printable-schedule, #printable-schedule * {
-                        visibility: visible;
-                    }
-                    /* Position the printable container at the top of the page */
-                    #printable-schedule {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                    }
-                    /* Hide elements that should not be printed */
-                    .no-print {
-                        display: none !important;
-                    }
-                    /* Override layout constraints on parent elements */
-                    body, #root, .flex.h-screen, main, .flex-1.overflow-y-auto {
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-                }
-            `}</style>
-            <div id="printable-schedule" className="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-end mb-4 gap-4 no-print">
-                    <button onClick={() => window.print()} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <button onClick={handleGeneratePdf} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
                         <Printer size={18} className="mr-2"/> {t.printSchedule}
                     </button>
                     {schedule.isLocked ? (
@@ -383,8 +382,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     )}
                     <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
                 </div>
-                <div className="overflow-x-auto">
-                    <h2 className="text-xl font-bold mb-4 print-only">{t.schedule} - {t.store} {selectedStore} - {t.currentWeek} {currentWeek}, {currentYear}</h2>
+                <div id="printable-schedule" className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
