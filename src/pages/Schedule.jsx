@@ -250,6 +250,51 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         setIsConfirmModalOpen(false);
     };
 
+    const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => {
+        if (!timeAdjustmentData) return;
+        const { row, dayIndex } = timeAdjustmentData;
+        
+        const date = new Date(currentYear, 0, 1 + (currentWeek - 1) * 7);
+        date.setDate(date.getDate() - date.getDay() + dayIndex);
+
+        const parseTime = (timeStr) => {
+            const isPm = timeStr.toLowerCase().includes('pm');
+            const isAm = timeStr.toLowerCase().includes('am');
+            let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(Number);
+            minutes = minutes || 0;
+            if (isPm && hours < 12) hours += 12;
+            if (isAm && hours === 12) hours = 0;
+            return { hours, minutes };
+        };
+
+        const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
+        const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
+
+        const clockInDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), inHours, inMinutes);
+        const clockOutDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), outHours, outMinutes);
+
+        try {
+            await fetch(`${API_BASE_URL}/timelog/adjust`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    employeeId: row.EmployeeID,
+                    storeId: selectedStore,
+                    clockIn: clockInDate.toISOString(),
+                    clockOut: clockOutDate.toISOString(),
+                    week: currentWeek,
+                    year: currentYear,
+                    reason: reason,
+                })
+            });
+            setNotification({ message: "Time adjustment saved.", type: 'success' });
+            fetchSchedule(); // Re-fetch schedule to update actual hours
+        } catch (error) {
+            console.error("Error saving time adjustment:", error);
+            setNotification({ message: "Error saving adjustment.", type: 'error' });
+        }
+    };
+
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
