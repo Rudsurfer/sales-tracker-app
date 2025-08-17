@@ -4,6 +4,8 @@ import { SaveButton, ConfirmationModal } from '../components/ui';
 import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // Helper function to convert decimal hours to HHh MMm format
 const decimalHoursToHM = (decimalHours) => {
@@ -338,19 +340,15 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.text(`${t.schedule} - ${t.store} ${selectedStore} - ${t.currentWeek} ${currentWeek}, ${currentYear}`, 14, 15);
 
-        const tableColumn = ["Employee Name", ...weekDays, "Total Hours"];
+        const tableColumn = ["Employee Name", ...weekDays, "Total Sched. Hrs"];
         const tableRows = [];
 
         schedule.rows.forEach(row => {
-            const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+            const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
             const rowData = [
                 row.Name,
-                ...DAYS_OF_WEEK.map(day => {
-                    const shift = row.shifts[day.toLowerCase()] || 'OFF';
-                    const actual = decimalHoursToHM(row.actualHours?.[day.toLowerCase()] || 0);
-                    return `${shift}\nActual: ${actual}`;
-                }),
-                decimalHoursToHM(totalActualHours)
+                ...DAYS_OF_WEEK.map(day => row.shifts[day.toLowerCase()] || 'OFF'),
+                decimalHoursToHM(totalScheduledHours)
             ];
             tableRows.push(rowData);
         });
