@@ -157,6 +157,13 @@ const SaleModal = ({ onClose, onSave, t, allEmployees, selectedStore, currentWee
                         </select>
                     </div>
                 </div>
+                <div className="grid grid-cols-7 gap-2 mb-2 px-2 text-xs text-gray-400">
+                    <label className="col-span-2">{t.salesRep}</label>
+                    <label className="col-span-2">{t.description}</label>
+                    <label>{t.category}</label>
+                    <label>{t.qty}</label>
+                    <label>{t.price}</label>
+                </div>
                 <div className="max-h-64 overflow-y-auto pr-2">
                     {sale.items.map((item, index) => (
                         <div key={index} className="grid grid-cols-7 gap-2 mb-2 items-center">
