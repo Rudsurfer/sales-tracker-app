@@ -102,10 +102,22 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
     };
     
     const handleConfirmImport = async () => {
-        // This function will need to be updated to call the backend API
-        console.log("Importing data:", importData);
-        setImportData(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (!importData || importData.length === 0) return;
+        try {
+            await fetch(`${API_BASE_URL}/employees/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(importData)
+            });
+            setNotification({ message: t.importSuccess, type: 'success' });
+            refreshEmployees();
+        } catch (error) {
+            console.error("Error importing employees:", error);
+            setNotification({ message: t.importError, type: 'error' });
+        } finally {
+            setImportData(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
     };
 
     const handleDownloadTemplate = () => {
