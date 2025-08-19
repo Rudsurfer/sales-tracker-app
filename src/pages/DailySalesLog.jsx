@@ -99,37 +99,36 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
 };
 
 const SaleModal = ({ onClose, onSave, t, allEmployees, selectedStore, currentWeek, currentYear, selectedDay, initialSale }) => {
-    const [sale, setSale] = useState(initialSale || {
-        invoiceNum: '',
-        type: TRANSACTION_TYPES.REGULAR,
-        paymentMethod: PAYMENT_METHODS[0],
-        notes: '',
-        items: [{ salesRep: '', description: '', category: SALE_CATEGORIES[0], quantity: 1, price: 0, total: 0 }]
+    const [sale, setSale] = useState(initialSale.SaleID ? initialSale : {
+        OrderNo: '',
+        Type_: TRANSACTION_TYPES.REGULAR,
+        PaymentMethod: PAYMENT_METHODS[0],
+        Notes: '',
+        items: [{ SalesRep: '', Description_: '', Category: SALE_CATEGORIES[0], Quantity: 1, Price: 0, Subtotal: 0 }]
     });
 
     const handleSaleChange = (field, value) => setSale(s => ({ ...s, [field]: value }));
     const handleItemChange = (index, field, value) => {
         const newItems = [...sale.items];
         newItems[index][field] = value;
-        if (field === 'quantity' || field === 'price') {
-            newItems[index].total = (newItems[index].quantity || 0) * (newItems[index].price || 0);
+        if (field === 'Quantity' || field === 'Price') {
+            newItems[index].Subtotal = (newItems[index].Quantity || 0) * (newItems[index].Price || 0);
         }
         setSale(s => ({ ...s, items: newItems }));
     };
-    const addItem = () => setSale(s => ({ ...s, items: [...s.items, { salesRep: '', description: '', category: SALE_CATEGORIES[0], quantity: 1, price: 0, total: 0 }] }));
+    const addItem = () => setSale(s => ({ ...s, items: [...s.items, { SalesRep: '', Description_: '', Category: SALE_CATEGORIES[0], Quantity: 1, Price: 0, Subtotal: 0 }] }));
     const removeItem = (index) => setSale(s => ({ ...s, items: s.items.filter((_, i) => i !== index) }));
     
-    const totalAmount = useMemo(() => sale.items.reduce((sum, item) => sum + item.total, 0), [sale.items]);
+    const totalAmount = useMemo(() => sale.items.reduce((sum, item) => sum + item.Subtotal, 0), [sale.items]);
 
     const handleSave = () => {
         onSave({
-            ...initialSale,
-            storeId: selectedStore,
-            week: currentWeek,
-            year: currentYear,
-            day: selectedDay,
             ...sale,
-            totalAmount
+            StoreID: selectedStore,
+            WeekNo: currentWeek,
+            YearNo: currentYear,
+            NameDay: selectedDay,
+            TotalAmount: totalAmount
         });
         onClose();
     };
