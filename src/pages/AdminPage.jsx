@@ -61,7 +61,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
                 fetch(`${API_BASE_URL}/employees/${emp.EmployeeID}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ PositionID: emp.PositionID, Name: emp.Name, JobTitle: emp.JobTitle, Rate: emp.Rate, BaseSalary: emp.BaseSalary, StoreID: emp.AssociatedStore })
+                    body: JSON.stringify({ PositionID: emp.PositionID, Name: emp.Name, JobTitle: emp.JobTitle, Rate: emp.Rate, BaseSalary: emp.BaseSalary, StoreID: emp.StoreID })
                 })
             );
             await Promise.all(promises);
@@ -102,10 +102,22 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
     };
     
     const handleConfirmImport = async () => {
-        // This function will need to be updated to call the backend API
-        console.log("Importing data:", importData);
-        setImportData(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (!importData || importData.length === 0) return;
+        try {
+            await fetch(`${API_BASE_URL}/employees/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(importData)
+            });
+            setNotification({ message: t.importSuccess, type: 'success' });
+            refreshEmployees();
+        } catch (error) {
+            console.error("Error importing employees:", error);
+            setNotification({ message: t.importError, type: 'error' });
+        } finally {
+            setImportData(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
     };
 
     const handleDownloadTemplate = () => {
@@ -155,7 +167,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
                                     <td className="px-4 py-2"><select value={emp.JobTitle} onChange={e => handleEmployeeChange(emp.EmployeeID, 'JobTitle', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}</select></td>
                                     <td className="px-4 py-2"><input type="number" value={emp.Rate} onChange={e => handleEmployeeChange(emp.EmployeeID, 'Rate', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
                                     <td className="px-4 py-2"><input type="number" value={emp.BaseSalary} onChange={e => handleEmployeeChange(emp.EmployeeID, 'BaseSalary', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
-                                    <td className="px-4 py-2"><select value={emp.AssociatedStore} onChange={e => handleEmployeeChange(emp.EmployeeID, 'AssociatedStore', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select></td>
+                                    <td className="px-4 py-2"><select value={emp.StoreID} onChange={e => handleEmployeeChange(emp.EmployeeID, 'StoreID', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select></td>
                                     <td className="px-4 py-2"><button onClick={() => handleDeleteEmployee(emp.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button></td>
                                 </tr>
                             ))}
