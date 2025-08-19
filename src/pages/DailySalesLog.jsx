@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PlusCircle, X, Trash2 } from 'lucide-react';
+import { PlusCircle, X, Trash2, ChevronDown, DollarSign, Hash } from 'lucide-react';
 import { DAYS_OF_WEEK, SALE_CATEGORIES, TRANSACTION_TYPES, PAYMENT_METHODS } from '../constants';
 import { formatCurrency } from '../utils/helpers';
 
 export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t, allEmployees }) => {
     const [sales, setSales] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [selectedDay, setSelectedDay] = useState(DAYS_OF_WEEK[new Date().getDay()]);
+    const [activeDay, setActiveDay] = useState(DAYS_OF_WEEK[new Date().getDay()]);
     const [editingSale, setEditingSale] = useState(null);
     
     const fetchSales = async () => {
@@ -51,49 +51,71 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
         setEditingSale(null);
     };
 
-    const salesForSelectedDay = sales.filter(s => s.NameDay === selectedDay);
+    const dailySummaries = useMemo(() => {
+        return DAYS_OF_WEEK.map(day => {
+            const daySales = sales.filter(s => s.NameDay === day);
+            return {
+                day,
+                totalSales: daySales.reduce((sum, s) => sum + s.TotalAmount, 0),
+                transactionCount: daySales.length
+            };
+        });
+    }, [sales]);
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div className="flex space-x-1 bg-gray-800 p-1 rounded-lg">
-                    {DAYS_OF_WEEK.map(day => (
-                        <button key={day} onClick={() => setSelectedDay(day)} className={`px-4 py-2 rounded-md text-sm font-bold ${selectedDay === day ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
-                            {day}
-                        </button>
-                    ))}
-                </div>
-                <button onClick={() => setEditingSale({})} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+        <div className="space-y-4">
+            <div className="flex justify-end">
+                 <button onClick={() => setEditingSale({})} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105">
                     <PlusCircle size={18} className="mr-2"/> Add Sale
                 </button>
             </div>
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-400">
-                        <thead className="text-xs text-gray-300 uppercase bg-gray-700">
-                            <tr>
-                                <th className="px-4 py-3">{t.invoiceNum}</th>
-                                <th className="px-4 py-3">{t.salesRep}</th>
-                                <th className="px-4 py-3">{t.items}</th>
-                                <th className="px-4 py-3 text-right">{t.total}</th>
-                                <th className="px-4 py-3">{t.payment}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {salesForSelectedDay.map(sale => (
-                                <tr key={sale.SaleID} onClick={() => setEditingSale(sale)} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer">
-                                    <td className="px-4 py-2 font-medium">{sale.OrderNo}</td>
-                                    <td className="px-4 py-2">{(sale.items || []).map(i => i.SalesRep).join(', ')}</td>
-                                    <td className="px-4 py-2">{(sale.items || []).length}</td>
-                                    <td className="px-4 py-2 text-right">{formatCurrency(sale.TotalAmount)}</td>
-                                    <td className="px-4 py-2">{sale.PaymentMethod}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {editingSale && <SaleModal onClose={() => setEditingSale(null)} onSave={handleSaveSale} {...{t, allEmployees, selectedStore, currentWeek, currentYear, selectedDay, initialSale: editingSale}} />}
+            {isLoading ? (
+                <div className="text-center p-8 text-white">Loading Sales Data...</div>
+            ) : (
+                dailySummaries.map(summary => (
+                    <div key={summary.day} className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+                        <button onClick={() => setActiveDay(activeDay === summary.day ? null : summary.day)} className="w-full p-4 flex justify-between items-center bg-gray-700/50 hover:bg-gray-700 transition-colors">
+                            <span className="text-lg font-bold text-white">{summary.day}</span>
+                            <div className="flex items-center gap-6 text-sm">
+                                <span className="flex items-center text-green-400"><DollarSign size={16} className="mr-1"/> {formatCurrency(summary.totalSales)}</span>
+                                <span className="flex items-center text-blue-400"><Hash size={16} className="mr-1"/> {summary.transactionCount} Transactions</span>
+                                <ChevronDown size={20} className={`text-gray-400 transition-transform ${activeDay === summary.day ? 'rotate-180' : ''}`} />
+                            </div>
+                        </button>
+                        {activeDay === summary.day && (
+                            <div className="p-4">
+                                {summary.transactionCount > 0 ? (
+                                    <table className="w-full text-sm text-left text-gray-300">
+                                        <thead className="text-xs text-gray-400 uppercase">
+                                            <tr>
+                                                <th className="px-4 py-2">{t.invoiceNum}</th>
+                                                <th className="px-4 py-2">{t.salesRep}</th>
+                                                <th className="px-4 py-2">{t.items}</th>
+                                                <th className="px-4 py-2 text-right">{t.total}</th>
+                                                <th className="px-4 py-2">{t.payment}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {sales.filter(s => s.NameDay === summary.day).map(sale => (
+                                                <tr key={sale.SaleID} onClick={() => setEditingSale(sale)} className="border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer">
+                                                    <td className="px-4 py-2 font-medium">{sale.OrderNo}</td>
+                                                    <td className="px-4 py-2">{(sale.items || []).map(i => i.SalesRep).join(', ')}</td>
+                                                    <td className="px-4 py-2">{(sale.items || []).length}</td>
+                                                    <td className="px-4 py-2 text-right">{formatCurrency(sale.TotalAmount)}</td>
+                                                    <td className="px-4 py-2">{sale.PaymentMethod}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p className="text-center text-gray-400 py-4">{t.noSalesForDay.replace('{day}', summary.day)}</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ))
+            )}
+            {editingSale && <SaleModal onClose={() => setEditingSale(null)} onSave={handleSaveSale} {...{t, allEmployees, selectedStore, currentWeek, currentYear, selectedDay: activeDay, initialSale: editingSale}} />}
         </div>
     );
 };
@@ -141,13 +163,22 @@ const SaleModal = ({ onClose, onSave, t, allEmployees, selectedStore, currentWee
                     <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <input type="text" placeholder={t.invoiceNum} value={sale.OrderNo} onChange={e => handleSaleChange('OrderNo', e.target.value)} className="bg-gray-900 border border-gray-600 rounded px-3 py-2" />
-                    <select value={sale.Type_} onChange={e => handleSaleChange('Type_', e.target.value)} className="bg-gray-900 border border-gray-600 rounded px-3 py-2">
-                        {Object.values(TRANSACTION_TYPES).map(type => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                     <select value={sale.PaymentMethod} onChange={e => handleSaleChange('PaymentMethod', e.target.value)} className="bg-gray-900 border border-gray-600 rounded px-3 py-2">
-                        {PAYMENT_METHODS.map(method => <option key={method} value={method}>{method}</option>)}
-                    </select>
+                    <div>
+                        <label className="text-xs text-gray-400">{t.invoiceNum}</label>
+                        <input type="text" value={sale.OrderNo} onChange={e => handleSaleChange('OrderNo', e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 mt-1" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400">{t.type}</label>
+                        <select value={sale.Type_} onChange={e => handleSaleChange('Type_', e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 mt-1">
+                            {Object.values(TRANSACTION_TYPES).map(type => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400">{t.payment}</label>
+                        <select value={sale.PaymentMethod} onChange={e => handleSaleChange('PaymentMethod', e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 mt-1">
+                            {PAYMENT_METHODS.map(method => <option key={method} value={method}>{method}</option>)}
+                        </select>
+                    </div>
                 </div>
                 <div className="max-h-64 overflow-y-auto pr-2">
                     {sale.items.map((item, index) => (
