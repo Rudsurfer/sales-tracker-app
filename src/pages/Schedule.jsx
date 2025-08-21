@@ -180,7 +180,10 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                         const clockInDate = new Date(log.ClockIn);
                         const clockOutDate = new Date(log.ClockOut);
                         const day = DAYS_OF_WEEK[clockInDate.getDay()].toLowerCase();
-                        const duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
+                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
+                        if (duration > 5) {
+                            duration -= 0.5;
+                        }
                         dailyHours[day] = (dailyHours[day] || 0) + duration;
                     }
                 });
