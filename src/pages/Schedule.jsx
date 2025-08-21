@@ -130,7 +130,7 @@ const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) 
     );
 };
 
-export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t, language }) => {
+export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
     const [schedule, setSchedule] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [editingObjectivesFor, setEditingObjectivesFor] = useState(null);
@@ -286,8 +286,10 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         if (!timeAdjustmentData) return;
         const { row, dayIndex } = timeAdjustmentData;
         
-        const date = new Date(currentYear, 0, 1 + (currentWeek - 1) * 7);
-        date.setDate(date.getDate() - date.getDay() + dayIndex);
+        const weekStartDate = new Date(currentDate);
+        weekStartDate.setDate(currentDate.getDate() - currentDate.getDay());
+        const adjustmentDate = new Date(weekStartDate);
+        adjustmentDate.setDate(weekStartDate.getDate() + dayIndex);
 
         const parseTime = (timeStr) => {
             const isPm = timeStr.toLowerCase().includes('pm');
@@ -302,8 +304,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
         const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
 
-        const clockInDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), inHours, inMinutes);
-        const clockOutDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), outHours, outMinutes);
+        const clockInDate = new Date(adjustmentDate.getFullYear(), adjustmentDate.getMonth(), adjustmentDate.getDate(), inHours, inMinutes);
+        const clockOutDate = new Date(adjustmentDate.getFullYear(), adjustmentDate.getMonth(), adjustmentDate.getDate(), outHours, outMinutes);
 
         try {
             await fetch(`${API_BASE_URL}/timelog/adjust`, {
@@ -333,44 +335,23 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         // This assumes timeAdjustmentData is already set with the row and day info
     };
 
-    const handleGeneratePdf = () => {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'landscape' });
-        doc.text(`${t.schedule} - ${t.store} ${selectedStore} - ${t.currentWeek} ${currentWeek}, ${currentYear}`, 14, 15);
-
-        const tableColumn = [t.employeeName, ...weekDays, t.totalSchedHrs];
-        const tableRows = [];
-
-        schedule.rows.forEach(row => {
-            const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-            const rowData = [
-                row.Name,
-                ...DAYS_OF_WEEK.map(day => row.shifts[day.toLowerCase()] || 'OFF'),
-                decimalHoursToHM(totalScheduledHours)
-            ];
-            tableRows.push(rowData);
-        });
-
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 20,
-            styles: { cellPadding: 2, fontSize: 8 },
-            headStyles: { fillColor: [41, 128, 185] },
-        });
-
-        doc.save(`schedule_W${currentWeek}.pdf`);
-    };
-
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
     return (
         <>
+            <style>{`
+                @media print {
+                    body * { visibility: hidden; }
+                    #printable-schedule, #printable-schedule * { visibility: visible; }
+                    #printable-schedule { position: absolute; left: 0; top: 0; width: 100%; }
+                    .no-print { display: none; }
+                }
+            `}</style>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-end mb-4 gap-4 no-print">
-                    <button onClick={handleGeneratePdf} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <button onClick={() => window.print()} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
                         <Printer size={18} className="mr-2"/> {t.printSchedule}
                     </button>
                     {schedule.isLocked ? (
@@ -385,6 +366,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
                 </div>
                 <div id="printable-schedule" className="overflow-x-auto">
+                    <h2 className="text-xl font-bold mb-4 print-only">{t.schedule} - {t.store} {selectedStore} - {t.currentWeek} {currentWeek}, {currentYear}</h2>
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
