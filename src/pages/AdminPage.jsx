@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, LogOut, PlusCircle, Trash2, Upload, Download } from 'lucide-react';
+import { Users, LogOut, PlusCircle, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
 import { ALL_STORES, JOB_TITLES } from '../constants';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import Papa from 'papaparse';
@@ -11,6 +11,7 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [importData, setImportData] = useState(null);
     const fileInputRef = useRef(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         setEmployees(allEmployees);
@@ -89,6 +90,24 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
         }
     };
 
+    const handleForceSync = async () => {
+        setIsSyncing(true);
+        setNotification({ message: 'Full data sync initiated...', type: 'info' });
+        try {
+            const response = await fetch(`${API_BASE_URL}/sync/force`, { method: 'POST' });
+            if (response.ok) {
+                setNotification({ message: 'Sync process started successfully.', type: 'success' });
+            } else {
+                 setNotification({ message: 'Failed to start sync process.', type: 'error' });
+            }
+        } catch (error) {
+            console.error("Error forcing sync:", error);
+            setNotification({ message: 'Error forcing sync.', type: 'error' });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         if (file) {
@@ -141,6 +160,10 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
             </header>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                  <div className="flex justify-end mb-4 gap-4">
+                    <button onClick={handleForceSync} disabled={isSyncing} className="flex items-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg disabled:opacity-50">
+                        <RefreshCw size={18} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                        {isSyncing ? 'Syncing...' : 'Force Sync All Data'}
+                    </button>
                     <button onClick={handleDownloadTemplate} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2" /> {t.downloadTemplate}</button>
                     <input type="file" ref={fileInputRef} accept=".csv" onChange={handleFileChange} className="hidden" id="csv-upload" />
                     <label htmlFor="csv-upload" className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer"><Upload size={18} className="mr-2" /> {t.importFromCsv}</label>
