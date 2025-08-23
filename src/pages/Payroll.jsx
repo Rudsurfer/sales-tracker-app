@@ -13,6 +13,8 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
     const [saveState, setSaveState] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [performanceGoals, setPerformanceGoals] = useState({});
+    const [sales, setSales] = useState([]);
+    const [schedule, setSchedule] = useState({ rows: [] });
 
     useEffect(() => {
         const fetchPayrollData = async () => {
@@ -24,60 +26,10 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
                     fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
                 ]);
 
-                const schedule = scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes;
-                const sales = salesRes.status === 'not_found' ? [] : salesRes;
+                setSchedule(scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes);
+                setSales(Array.isArray(salesRes) ? salesRes : []);
                 setPerformanceGoals(goalsRes.status === 'not_found' ? {} : goalsRes);
                 
-                const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
-                
-                const calculatedPayroll = homeStoreEmployees.map(emp => {
-                    let totalHours = 0;
-                    let totalSales = 0;
-                    const workLocations = new Set();
-                    
-                    const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
-                    if (scheduleRow) {
-                        totalHours = Object.values(scheduleRow.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-                        if(totalHours > 0) workLocations.add(selectedStore);
-                    }
-
-                    (sales || []).forEach(sale => {
-                         (sale.items || []).forEach(item => {
-                            if (item.SalesRep === emp.Name) {
-                                const itemValue = item.Subtotal;
-                                totalSales += itemValue;
-                            }
-                        });
-                    });
-                    
-                    const regularHours = Math.min(totalHours, 40);
-                    const otHours = Math.max(0, totalHours - 40);
-                    const commission = totalSales * 0.02; // Using 2% flat rate
-                    const base = emp.BaseSalary > 0 ? emp.BaseSalary / 52 : 0;
-                    const rate = emp.Rate || 0;
-                    const gross = (rate * regularHours) + (rate * 1.5 * otHours) + base + commission;
-                    
-                    return {
-                        id: emp.EmployeeID,
-                        payrollName: emp.Name,
-                        positionId: `FOLT000${emp.PositionID}`,
-                        jobTitleDescription: emp.JobTitle,
-                        workLocations: Array.from(workLocations).join(', '),
-                        commissionPlan: '2', // Hardcoded 2%
-                        rate: rate,
-                        base: base,
-                        regularHours,
-                        otHours,
-                        salesResults: totalSales,
-                        commission,
-                        weeklyGrossEarnings: gross,
-                        bonusPay: 0, adjHrs: 0, vacationHours: 0, adjCommissions: 0, ecommerceCommissions: 0, other: 0,
-                        retroPay: 0, payInLieuQC: 0, payInLieu: 0, finalTerminationPay: 0, comments: '', statHoliday: 0,
-                        personalHours: 0, sickHours: 0, subTotal: 0, adjustments: 0, statHolidayHours: 0,
-                    };
-                });
-                setPayrollData(calculatedPayroll);
-
             } catch (error) {
                 console.error("Error fetching payroll data:", error);
             } finally {
@@ -85,7 +37,60 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
             }
         };
         fetchPayrollData();
-    }, [selectedStore, currentWeek, currentYear, allEmployees, API_BASE_URL]);
+    }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
+
+    useEffect(() => {
+        const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
+        
+        const calculatedPayroll = homeStoreEmployees.map(emp => {
+            let totalHours = 0;
+            let totalSales = 0;
+            const workLocations = new Set();
+            
+            const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
+            if (scheduleRow) {
+                totalHours = Object.values(scheduleRow.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                if(totalHours > 0) workLocations.add(selectedStore);
+            }
+
+            (sales || []).forEach(sale => {
+                 (sale.items || []).forEach(item => {
+                    if (item.SalesRep === emp.Name) {
+                        const itemValue = item.Subtotal;
+                        totalSales += itemValue;
+                    }
+                });
+            });
+            
+            const regularHours = Math.min(totalHours, 40);
+            const otHours = Math.max(0, totalHours - 40);
+            const commission = totalSales * 0.02; // Using 2% flat rate
+            const base = emp.BaseSalary > 0 ? emp.BaseSalary / 52 : 0;
+            const rate = emp.Rate || 0;
+            const gross = (rate * regularHours) + (rate * 1.5 * otHours) + base + commission;
+            
+            return {
+                id: emp.EmployeeID,
+                payrollName: emp.Name,
+                positionId: `FOLT000${emp.PositionID}`,
+                jobTitleDescription: emp.JobTitle,
+                workLocations: Array.from(workLocations).join(', '),
+                commissionPlan: '2', // Hardcoded 2%
+                rate: rate,
+                base: base,
+                regularHours,
+                otHours,
+                salesResults: totalSales,
+                commission,
+                weeklyGrossEarnings: gross,
+                bonusPay: 0, adjHrs: 0, vacationHours: 0, adjCommissions: 0, ecommerceCommissions: 0, other: 0,
+                retroPay: 0, payInLieuQC: 0, payInLieu: 0, finalTerminationPay: 0, comments: '', statHoliday: 0,
+                personalHours: 0, sickHours: 0, subTotal: 0, adjustments: 0, statHolidayHours: 0,
+            };
+        });
+        setPayrollData(calculatedPayroll);
+    }, [schedule, sales, allEmployees, selectedStore]);
+
 
     const handlePayrollChange = (id, field, value) => {
         setPayrollData(currentData => currentData.map(row => {
