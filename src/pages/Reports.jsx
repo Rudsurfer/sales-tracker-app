@@ -32,7 +32,7 @@ const TrendChart = ({ data, dataKey, title, color, formatter }) => (
 );
 
 const RADIAN = Math.PI / 180;
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -58,7 +58,7 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
                     fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
                     fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
                 ]);
-                setSales(salesRes.status === 'not_found' ? [] : salesRes);
+                setSales(Array.isArray(salesRes) ? salesRes : []);
                 setSchedule(scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes);
 
                 const historyPromises = [];
@@ -77,7 +77,7 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
                 for (let i = 0; i < historyResults.length; i += 3) {
                     formattedHistory.push({
                         week: currentWeek - (i/3),
-                        sales: historyResults[i].status === 'not_found' ? [] : historyResults[i],
+                        sales: Array.isArray(historyResults[i]) ? historyResults[i] : [],
                         schedule: historyResults[i+1].status === 'not_found' ? { rows: [] } : historyResults[i+1],
                         stc: historyResults[i+2].status === 'not_found' ? { HourlyData: {} } : historyResults[i+2]
                     });
@@ -92,6 +92,30 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
         };
         fetchData();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
+
+    const trendData = useMemo(() => {
+        return historicalData.map(weeklyData => {
+            const { sales, schedule, stc } = weeklyData;
+            
+            const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
+            const netSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
+            const totalTransactions = merchandiseSales.length;
+            const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
+            
+            const totalTraffic = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0), 0);
+            const totalSTCTransactions = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0), 0);
+            const totalHours = (schedule.rows || []).reduce((sum, row) => sum + Object.values(row.actualHours || {}).reduce((hSum, h) => hSum + Number(h), 0), 0);
+
+            return {
+                name: `W${weeklyData.week}`,
+                netSales,
+                conversionRate: totalTraffic > 0 ? (totalSTCTransactions / totalTraffic) * 100 : 0,
+                dollarsPerHour: totalHours > 0 ? netSales / totalHours : 0,
+                avgTransactionValue: totalTransactions > 0 ? netSales / totalTransactions : 0,
+                unitsPerTransaction: totalTransactions > 0 ? totalUnits / totalTransactions : 0,
+            };
+        });
+    }, [historicalData]);
 
     const currentWeekMetrics = useMemo(() => {
         const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
