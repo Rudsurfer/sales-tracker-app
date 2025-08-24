@@ -92,20 +92,10 @@ export const AdminPage = ({ onExit, t, setNotification, API_BASE_URL, allEmploye
 
     const handleForceSync = async () => {
         setIsSyncing(true);
-        setNotification({ message: 'Full data sync initiated...', type: 'info' });
-        try {
-            const response = await fetch(`${API_BASE_URL}/sync/force`, { method: 'POST' });
-            if (response.ok) {
-                setNotification({ message: 'Sync process started successfully.', type: 'success' });
-            } else {
-                 setNotification({ message: 'Failed to start sync process.', type: 'error' });
-            }
-        } catch (error) {
-            console.error("Error forcing sync:", error);
-            setNotification({ message: 'Error forcing sync.', type: 'error' });
-        } finally {
-            setIsSyncing(false);
-        }
+        setNotification({ message: 'Refreshing data from the database...', type: 'info' });
+        await refreshEmployees();
+        setNotification({ message: 'Data refreshed successfully!', type: 'success' });
+        setIsSyncing(false);
     };
 
     const handleFileChange = (event) => {
