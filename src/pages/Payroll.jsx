@@ -40,11 +40,28 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
     useEffect(() => {
+        const employeeSalesMap = new Map();
+        (sales || []).forEach(sale => {
+            (sale.items || []).forEach(item => {
+                if (item.SalesRep) {
+                    const currentSales = employeeSalesMap.get(item.SalesRep) || 0;
+                    employeeSalesMap.set(item.SalesRep, currentSales + item.Subtotal);
+                }
+            });
+        });
+
+        const allRelevantEmployeeNames = new Set([
+            ...homeStoreEmployees.map(e => e.Name),
+            ...Array.from(employeeSalesMap.keys())
+        ]);
+
         const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
         
-        const calculatedPayroll = homeStoreEmployees.map(emp => {
+        const calculatedPayroll = Array.from(allRelevantEmployeeNames).map(name => {
+            const emp = allEmployees.find(e => e.Name === name);
+            if (!emp || emp.StoreID !== selectedStore) return null;
+
             let totalHours = 0;
-            let totalSales = 0;
             const workLocations = new Set();
             
             const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
@@ -53,14 +70,7 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
                 if(totalHours > 0) workLocations.add(selectedStore);
             }
 
-            (sales || []).forEach(sale => {
-                 (sale.items || []).forEach(item => {
-                    if (item.SalesRep === emp.Name) {
-                        const itemValue = item.Subtotal;
-                        totalSales += itemValue;
-                    }
-                });
-            });
+            const totalSales = employeeSalesMap.get(name) || 0;
             
             const regularHours = Math.min(totalHours, 40);
             const otHours = Math.max(0, totalHours - 40);
@@ -87,7 +97,8 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
                 retroPay: 0, payInLieuQC: 0, payInLieu: 0, finalTerminationPay: 0, comments: '', statHoliday: 0,
                 personalHours: 0, sickHours: 0, subTotal: 0, adjustments: 0, statHolidayHours: 0,
             };
-        });
+        }).filter(Boolean);
+
         setPayrollData(calculatedPayroll);
     }, [schedule, sales, allEmployees, selectedStore]);
 

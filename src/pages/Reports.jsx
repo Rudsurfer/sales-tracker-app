@@ -93,30 +93,6 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
         fetchData();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
-    const trendData = useMemo(() => {
-        return historicalData.map(weeklyData => {
-            const { sales, schedule, stc } = weeklyData;
-            
-            const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
-            const netSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
-            const totalTransactions = merchandiseSales.length;
-            const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
-            
-            const totalTraffic = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0), 0);
-            const totalSTCTransactions = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0), 0);
-            const totalHours = (schedule.rows || []).reduce((sum, row) => sum + Object.values(row.actualHours || {}).reduce((hSum, h) => hSum + Number(h), 0), 0);
-
-            return {
-                name: `W${weeklyData.week}`,
-                netSales,
-                conversionRate: totalTraffic > 0 ? (totalSTCTransactions / totalTraffic) * 100 : 0,
-                dollarsPerHour: totalHours > 0 ? netSales / totalHours : 0,
-                avgTransactionValue: totalTransactions > 0 ? netSales / totalTransactions : 0,
-                unitsPerTransaction: totalTransactions > 0 ? totalUnits / totalTransactions : 0,
-            };
-        });
-    }, [historicalData]);
-
     const currentWeekMetrics = useMemo(() => {
         const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
         const returns = (sales || []).filter(s => s.Type_ === TRANSACTION_TYPES.RETURN);
