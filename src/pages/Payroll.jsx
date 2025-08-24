@@ -40,6 +40,8 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
     useEffect(() => {
+        if (isLoading) return;
+
         const employeeSalesMap = new Map();
         (sales || []).forEach(sale => {
             (sale.items || []).forEach(item => {
@@ -50,12 +52,12 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
             });
         });
 
+        const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
+        
         const allRelevantEmployeeNames = new Set([
             ...homeStoreEmployees.map(e => e.Name),
             ...Array.from(employeeSalesMap.keys())
         ]);
-
-        const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
         
         const calculatedPayroll = Array.from(allRelevantEmployeeNames).map(name => {
             const emp = allEmployees.find(e => e.Name === name);
@@ -100,7 +102,7 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
         }).filter(Boolean);
 
         setPayrollData(calculatedPayroll);
-    }, [schedule, sales, allEmployees, selectedStore]);
+    }, [schedule, sales, allEmployees, selectedStore, isLoading]);
 
 
     const handlePayrollChange = (id, field, value) => {
