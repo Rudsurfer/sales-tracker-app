@@ -55,7 +55,7 @@ const KPIStatCard = ({ title, value, icon: Icon, color, valueColorClass = 'text-
 export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL }) => {
     const [sales, setSales] = useState([]);
     const [schedule, setSchedule] = useState({ rows: [] });
-    const [stcData, setStcData] = useState({ days: {} });
+    const [stcData, setStcData] = useState({ HourlyData: {} });
     const [performanceGoals, setPerformanceGoals] = useState({});
     const [isLoading, setIsLoading] = useState(true);
 
@@ -65,15 +65,15 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             setIsLoading(true);
             try {
                 const [salesRes, scheduleRes, stcRes, goalsRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/stc/${selectedStore}/${currentWeek}/${currentYear}`),
-                    fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`)
+                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/stc/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
                 ]);
-                setSales(await salesRes.json());
-                setSchedule(await scheduleRes.json());
-                setStcData(await stcRes.json());
-                setPerformanceGoals(await goalsRes.json());
+                setSales(Array.isArray(salesRes) ? salesRes : []);
+                setSchedule(scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes);
+                setStcData(stcRes.status === 'not_found' ? { HourlyData: {} } : stcRes);
+                setPerformanceGoals(goalsRes.status === 'not_found' ? {} : goalsRes);
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {
@@ -84,12 +84,12 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
     const { netSales, avgTransactionValue, unitsPerTransaction, conversionRate, leaderboardData, categorySalesData, payrollPercentage, payrollPercentageColor } = useMemo(() => {
-        let totalNetSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
+        let totalNetSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
         
         const employeeSalesMap = new Map();
         const categoryTotals = {};
 
-        sales.forEach(sale => {
+        (sales || []).forEach(sale => {
             if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD || sale.Type_ === TRANSACTION_TYPES.RETURN) return;
             (sale.items || []).forEach(item => {
                 const rep = item.SalesRep;
@@ -102,7 +102,7 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             });
         });
         
-        const merchandiseSales = sales.filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
+        const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
         const totalTransactions = merchandiseSales.length;
         const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
         
@@ -125,13 +125,13 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             .sort((a,b) => b.value - a.value);
             
         let totalCostForPercentage = 0;
-        const homeStoreEmployees = allEmployees.filter(e => e.AssociatedStore === selectedStore);
+        const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
 
         homeStoreEmployees.forEach(emp => {
             let totalHours = 0;
             const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
             if (scheduleRow) {
-                totalHours = Object.values(scheduleRow.ActualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                totalHours = Object.values(scheduleRow.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
             }
 
             if (emp.BaseSalary > 0) {
@@ -163,8 +163,8 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
     }, [sales, stcData, schedule, allEmployees, selectedStore, t]);
     
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
-    const dailyTarget = performanceGoals.DailyGoals?.[todayString.toLowerCase()] || 0;
-    const dailyActual = sales.filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
+    const dailyTarget = JSON.parse(performanceGoals.DailyGoals || '{}')?.[todayString.toLowerCase()] || 0;
+    const dailyActual = (sales || []).filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
     const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
 
     const weeklyTarget = performanceGoals.WeeklySalesTarget || 0;
