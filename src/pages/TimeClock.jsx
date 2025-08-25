@@ -72,7 +72,7 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     employeeId: employee.EmployeeID,
-                    storeId: employee.AssociatedStore,
+                    storeId: employee.StoreID,
                     week: getWeekNumber(now),
                     year: now.getFullYear(),
                 })
@@ -80,6 +80,7 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
             const openLog = await findOpenLog(employee.EmployeeID);
             setActiveLog(openLog);
             setNotification({ message: t.clockInSuccess, type: 'success' });
+            setTimeout(resetState, 1500);
         } catch (error) {
             console.error("Error clocking in:", error);
             setNotification({ message: "Error clocking in.", type: 'error' });
@@ -96,6 +97,7 @@ export const TimeClock = ({ onExit, t, setNotification, allEmployees, API_BASE_U
             });
             setActiveLog(null);
             setNotification({ message: t.clockOutSuccess, type: 'success' });
+            setTimeout(resetState, 1500);
         } catch (error) {
             console.error("Error clocking out:", error);
             setNotification({ message: "Error clocking out.", type: 'error' });

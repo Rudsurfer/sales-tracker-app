@@ -118,7 +118,7 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                                 return (
                                     <tr key={hour} className="border-b border-gray-700">
                                         <td className="px-4 py-2 font-medium">{hour}</td>
-                                        <td><input type="number" value={hourData.traffic || ''} onChange={e => handleChange(hour, 'traffic', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
+                                        <td><input type="number" value={hourData.traffic || ''} readOnly className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
                                         <td><input type="number" value={hourData.transactions || ''} onChange={e => handleChange(hour, 'transactions', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td><input type="number" value={hourData.employees || ''} onChange={e => handleChange(hour, 'employees', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td className="font-bold">{conversion.toFixed(2)}%</td>

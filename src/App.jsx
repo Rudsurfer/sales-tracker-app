@@ -71,12 +71,15 @@ export default function App() {
     }, [notification]);
 
     const fetchEmployees = async () => {
+        setIsCoreDataLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/employees`);
+            if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
             setAllEmployees(data);
         } catch (error) {
             console.error("Error fetching employees:", error);
+            setNotification({ message: 'Failed to load employee data.', type: 'error' });
         } finally {
             setIsCoreDataLoading(false);
         }

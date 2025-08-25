@@ -19,12 +19,17 @@ export const DailyPlanner = ({ selectedStore, currentDate, API_BASE_URL, setNoti
                 const response = await fetch(`${API_BASE_URL}/planners/${selectedStore}/${dateString}`);
                 if (response.ok) {
                     const data = await response.json();
-                    setPlanner(data);
+                    setPlanner({
+                        notes: data.Notes || '',
+                        priorities: data.Priorities || [],
+                        tasks: data.Tasks || []
+                    });
                 } else {
                     setPlanner({ notes: '', priorities: [], tasks: [] });
                 }
             } catch (error) {
                 console.error("Error fetching planner:", error);
+                setPlanner({ notes: '', priorities: [], tasks: [] });
             } finally {
                 setIsLoading(false);
             }
@@ -41,7 +46,9 @@ export const DailyPlanner = ({ selectedStore, currentDate, API_BASE_URL, setNoti
                 body: JSON.stringify({
                     storeId: selectedStore,
                     date: dateString,
-                    ...planner
+                    notes: planner.notes,
+                    priorities: planner.priorities,
+                    tasks: planner.tasks
                 })
             });
             setSaveState('saved');
@@ -54,7 +61,7 @@ export const DailyPlanner = ({ selectedStore, currentDate, API_BASE_URL, setNoti
         }
         setIsConfirmModalOpen(false);
     };
-    
+
     const handleAddPriority = () => {
         if (newPriority.trim()) {
             setPlanner(p => ({ ...p, priorities: [...p.priorities, newPriority] }));

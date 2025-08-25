@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR } from '../constants';
 
 export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t, language }) => {
     const [goals, setGoals] = useState({
-        weeklySalesTarget: 0,
         daily: {},
         kpi: { dph: 0, dpt: 0, upt: 0 }
     });
@@ -13,27 +12,34 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
-    useEffect(() => {
-        const fetchGoals = async () => {
-            setIsLoading(true);
-            try {
-                const response = await fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setGoals({
-                        weeklySalesTarget: data.WeeklySalesTarget || 0,
-                        daily: data.DailyGoals || {},
-                        kpi: data.KpiTargets || { dph: 0, dpt: 0, upt: 0 }
-                    });
-                }
-            } catch (error) {
-                console.error("Error fetching goals:", error);
-            } finally {
-                setIsLoading(false);
+    const fetchGoals = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`);
+            if (response.ok) {
+                const data = await response.json();
+                setGoals({
+                    daily: JSON.parse(data.DailyGoals || '{}'),
+                    kpi: JSON.parse(data.KpiTargets || '{"dph":0,"dpt":0,"upt":0}')
+                });
+            } else {
+                 setGoals({ daily: {}, kpi: { dph: 0, dpt: 0, upt: 0 } });
             }
-        };
+        } catch (error) {
+            console.error("Error fetching goals:", error);
+            setGoals({ daily: {}, kpi: { dph: 0, dpt: 0, upt: 0 } });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchGoals();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
+
+    const weeklySalesTarget = useMemo(() => {
+        return Object.values(goals.daily).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    }, [goals.daily]);
 
     const handleChange = (type, key, value) => {
         setGoals(prev => ({
@@ -52,7 +58,7 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
                     storeId: selectedStore,
                     week: currentWeek,
                     year: currentYear,
-                    weeklySalesTarget: goals.weeklySalesTarget,
+                    weeklySalesTarget: weeklySalesTarget,
                     dailyGoals: goals.daily,
                     kpiTargets: goals.kpi
                 })
@@ -60,6 +66,7 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
             setSaveState('saved');
             setNotification({ message: t.goalsSavedSuccess, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
+            fetchGoals(); // Re-fetch data after saving
         } catch (error) {
             console.error("Error saving goals:", error);
             setNotification({ message: t.errorSavingGoals, type: 'error' });
@@ -79,7 +86,7 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">{t.weeklySalesTarget}</label>
-                        <input type="number" value={goals.weeklySalesTarget} onChange={e => setGoals(g => ({...g, weeklySalesTarget: e.target.value}))} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                        <input type="number" value={weeklySalesTarget} readOnly className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2" />
                     </div>
                 </div>
             </div>
