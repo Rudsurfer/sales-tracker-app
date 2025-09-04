@@ -11,27 +11,28 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
     const [editingSale, setEditingSale] = useState(null);
     const [saveState, setSaveState] = useState('idle');
     
-    const fetchSales = async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`);
-            if (response.ok) {
-                const data = await response.json();
-                setSales(data);
-            } else {
-                setSales([]);
-            }
-        } catch (error) {
-            console.error("Error fetching sales:", error);
-            setSales([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     useEffect(() => {
+        const fetchSales = async () => {
+            if (!selectedStore || !currentWeek || !currentYear) return;
+            setIsLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setSales(data);
+                } else {
+                    setSales([]);
+                }
+            } catch (error) {
+                console.error("Error fetching sales:", error);
+                setSales([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
         fetchSales();
-    }, [selectedStore, currentWeek, currentYear]);
+    }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
     const handleSaveSale = async (saleToSave) => {
         // ... (This logic remains for saving manual/edited sales)
