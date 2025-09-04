@@ -60,7 +60,9 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
             </div>
 
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <h3 className="text-xl font-bold mb-4 text-white">{t.salesFor.replace('{day}', t[selectedDay.toLowerCase()])}</h3>
+                <h3 className="text-xl font-bold mb-4 text-white">
+                    {(t.salesFor || 'Sales for {day}').replace('{day}', t[selectedDay.toLowerCase()] || selectedDay)}
+                </h3>
                  <div className="max-h-96 overflow-y-auto pr-2">
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700 sticky top-0">

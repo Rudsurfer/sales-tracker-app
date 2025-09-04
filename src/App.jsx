@@ -4,7 +4,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 import { firebaseConfig } from './firebaseConfig';
 import { translations } from './translations';
-import { ALL_STORES } from './constants'; 
+import { ALL_STORES } from './constants';
 import { getWeekNumber } from './utils/helpers';
 
 import { Sidebar } from './components/Sidebar';
@@ -25,7 +25,7 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-const API_BASE_URL = 'https://vq_api.rudsak.com/api';
+const API_BASE_URL = '[https://vq-api.rudsak.com/api](https://vq-api.rudsak.com/api)';
 
 let app, auth;
 try {
