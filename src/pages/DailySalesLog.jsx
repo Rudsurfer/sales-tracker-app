@@ -103,7 +103,6 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
     const [isLoading, setIsLoading] = useState(true);
     const [selectedDay, setSelectedDay] = useState(DAYS_OF_WEEK[new Date().getDay()]);
     const [editingSale, setEditingSale] = useState(null);
-    const [saveState, setSaveState] = useState('idle');
     
     const fetchSales = async () => {
         if (!selectedStore || !currentWeek || !currentYear) return;
@@ -133,13 +132,11 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
         const method = isEditing ? 'PUT' : 'POST';
         const url = isEditing ? `${API_BASE_URL}/sales/${saleToSave.SaleID}` : `${API_BASE_URL}/sales`;
 
-        // Add context for new sales
         if (!isEditing) {
             saleToSave.StoreID = selectedStore;
             saleToSave.WeekNo = currentWeek;
             saleToSave.YearNo = currentYear;
             saleToSave.NameDay = selectedDay;
-            // The backend will set the TransactionDate
         }
 
         try {
