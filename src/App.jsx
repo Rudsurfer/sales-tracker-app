@@ -25,7 +25,7 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-const API_BASE_URL = '[https://vq-api.rudsak.com/api](https://vq-api.rudsak.com/api)';
+const API_BASE_URL = '[https://vq_api.rudsak.com/api](https://vq_api.rudsak.com/api)';
 
 let app, auth;
 try {
@@ -160,3 +160,4 @@ export default function App() {
         </div>
     );
 }
+
