@@ -93,7 +93,7 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD || sale.Type_ === TRANSACTION_TYPES.RETURN) return;
             (sale.items || []).forEach(item => {
                 const rep = item.SalesRep;
-                 const itemValue = item.Subtotal;
+                const itemValue = item.Subtotal;
                 if(rep) {
                     employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
                 }
@@ -135,8 +135,8 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             }
 
             if (emp.BaseSalary > 0) {
-                 const effectiveHourlyRate = (emp.BaseSalary / 52) / 40;
-                 totalCostForPercentage += (effectiveHourlyRate * totalHours);
+                const effectiveHourlyRate = (emp.BaseSalary / 52) / 40;
+                totalCostForPercentage += (effectiveHourlyRate * totalHours);
             } else {
                 const regularHours = Math.min(totalHours, 40);
                 const otHours = Math.max(0, totalHours - 40);
@@ -160,7 +160,7 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             payrollPercentage: percentage,
             payrollPercentageColor: colorClass
         };
-    }, [sales, stcData, schedule, allEmployees, selectedStore, t]);
+    }, [sales, stcData, schedule, allEmployees, selectedStore]);
     
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
     const dailyTarget = JSON.parse(performanceGoals.DailyGoals || '{}')?.[todayString.toLowerCase()] || 0;

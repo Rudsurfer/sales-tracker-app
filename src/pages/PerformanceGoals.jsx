@@ -66,7 +66,7 @@ export const PerformanceGoals = ({ selectedStore, currentWeek, currentYear, API_
             setSaveState('saved');
             setNotification({ message: t.goalsSavedSuccess, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
-            fetchGoals(); // Re-fetch data after saving
+            fetchGoals(); 
         } catch (error) {
             console.error("Error saving goals:", error);
             setNotification({ message: t.errorSavingGoals, type: 'error' });

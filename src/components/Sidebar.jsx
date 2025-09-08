@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart2, Target, ClipboardList, Calendar, FileText, DollarSign, TrendingUp, Users, LogOut, Clock } from 'lucide-react';
+import { BarChart2, Target, ClipboardList, Calendar, DollarSign, TrendingUp, Users, LogOut, Clock } from 'lucide-react';
 
 export const Sidebar = ({ currentPage, onNavClick, onChangeStore, t }) => {
     const navItems = [
@@ -7,10 +7,10 @@ export const Sidebar = ({ currentPage, onNavClick, onChangeStore, t }) => {
         { name: 'Performance Goals', key: 'performanceGoals', icon: Target },
         { name: 'Daily Planner', key: 'dailyPlanner', icon: ClipboardList },
         { name: 'Schedule', key: 'schedule', icon: Calendar },
-        { name: 'Payroll', key: 'payroll', icon: FileText },
         { name: 'Daily Sales Log', key: 'dailySalesLog', icon: DollarSign },
         { name: 'STC', key: 'stc', icon: TrendingUp },
         { name: 'Reports', key: 'reports', icon: Users },
+        { name: 'Time Clock', key: 'timeClock', icon: Clock },
     ];
     return (
         <nav className="w-64 bg-gray-800/50 p-4 flex flex-col no-print">
@@ -31,11 +31,7 @@ export const Sidebar = ({ currentPage, onNavClick, onChangeStore, t }) => {
                 </ul>
             </div>
             <div className="mt-auto">
-                 <button onClick={() => onNavClick('Time Clock')} className="flex w-full items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors duration-200">
-                    <Clock className="mr-3" size={20} />
-                    <span>{t.timeClock}</span>
-                </button>
-                 <button onClick={onChangeStore} className="flex w-full items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors duration-200">
+                <button onClick={onChangeStore} className="flex w-full items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors duration-200">
                     <LogOut className="mr-3" size={20} />
                     <span>{t.changeStore}</span>
                 </button>

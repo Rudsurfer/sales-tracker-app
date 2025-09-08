@@ -15,7 +15,7 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
             const response = await fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`);
             if (response.ok) {
                 const data = await response.json();
-                setSales(data);
+                setSales(Array.isArray(data) ? data : []);
             } else {
                 setSales([]);
             }
@@ -28,7 +28,9 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
     };
 
     useEffect(() => {
-        fetchSales();
+        if(selectedStore && currentWeek && currentYear) {
+            fetchSales();
+        }
     }, [selectedStore, currentWeek, currentYear]);
 
     const handleSaveSale = async (saleToSave) => {
@@ -37,13 +39,14 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
         const method = isEditing ? 'PUT' : 'POST';
 
         try {
-            await fetch(url, {
+            const response = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(saleToSave)
             });
+            if (!response.ok) throw new Error('Save operation failed');
             setNotification({ message: `Sale ${isEditing ? 'updated' : 'added'} successfully!`, type: 'success' });
-            fetchSales(); // Refresh sales data
+            fetchSales(); 
         } catch (error) {
             console.error(`Error ${isEditing ? 'updating' : 'adding'} sale:`, error);
             setNotification({ message: `Error ${isEditing ? 'updating' : 'adding'} sale.`, type: 'error' });
@@ -51,7 +54,9 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
         setEditingSale(null);
     };
 
-    const salesForSelectedDay = sales.filter(s => s.NameDay === selectedDay);
+    const salesForSelectedDay = useMemo(() => {
+        return sales.filter(s => s.NameDay === selectedDay);
+    }, [sales, selectedDay]);
 
     return (
         <div className="space-y-6">
@@ -83,7 +88,7 @@ export const DailySalesLog = ({ selectedStore, currentWeek, currentYear, API_BAS
                             {salesForSelectedDay.map(sale => (
                                 <tr key={sale.SaleID} onClick={() => setEditingSale(sale)} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer">
                                     <td className="px-4 py-2 font-medium">{sale.OrderNo}</td>
-                                    <td className="px-4 py-2">{(sale.items || []).map(i => i.SalesRep).join(', ')}</td>
+                                    <td className="px-4 py-2">{(sale.items || []).map(i => i.SalesRep).filter(Boolean).join(', ')}</td>
                                     <td className="px-4 py-2">{(sale.items || []).length}</td>
                                     <td className="px-4 py-2 text-right">{formatCurrency(sale.TotalAmount)}</td>
                                     <td className="px-4 py-2">{sale.PaymentMethod}</td>
@@ -127,15 +132,15 @@ const SaleModal = ({ onClose, onSave, t, allEmployees, selectedStore, currentWee
             WeekNo: currentWeek,
             YearNo: currentYear,
             NameDay: selectedDay,
-            TotalAmount: totalAmount
+            TotalAmount: totalAmount,
+            Notes: sale.Notes || ''
         });
-        onClose();
     };
 
     return (
-         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-4xl">
-                 <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-white">{initialSale.SaleID ? 'Edit Sale' : 'Add New Sale'}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
                 </div>

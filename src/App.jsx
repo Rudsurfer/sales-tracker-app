@@ -4,7 +4,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 import { firebaseConfig } from './firebaseConfig';
 import { translations } from './translations';
-import { ALL_STORES } from './constants';
+import { ALL_STORES } from './constants'; 
 import { getWeekNumber } from './utils/helpers';
 
 import { Sidebar } from './components/Sidebar';
@@ -25,7 +25,7 @@ import { TimeClock } from './pages/TimeClock';
 
 import { Building2 } from 'lucide-react';
 
-const API_BASE_URL = 'https://vq_api.rudsak.com/api';
+const API_BASE_URL = '[https://vq-api.rudsak.com/api](https://vq-api.rudsak.com/api)';
 
 let app, auth;
 try {
@@ -47,7 +47,6 @@ export default function App() {
     const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
     
     const [notification, setNotification] = useState(null);
-    const [isPayrollUnlocked, setIsPayrollUnlocked] = useState(false);
     const [passcodeChallenge, setPasscodeChallenge] = useState(null);
 
     const t = translations[language];
@@ -96,24 +95,13 @@ export default function App() {
             setView('timeClock');
             return;
         }
-        if (page === 'Payroll' && !isPayrollUnlocked) {
-             setPasscodeChallenge({ type: 'payroll' });
-        } else {
-            setCurrentPage(page);
-        }
-        if (page !== 'Payroll') {
-            setIsPayrollUnlocked(false);
-        }
+        setCurrentPage(page);
     };
 
     const handlePasscodeSuccess = () => {
-        if (passcodeChallenge?.type === 'payroll') {
-            setIsPayrollUnlocked(true);
-            setCurrentPage('Payroll');
-        } else if (passcodeChallenge?.type === 'store') {
+        if (passcodeChallenge?.type === 'store') {
             setSelectedStore(passcodeChallenge.id);
             setView('dashboard');
-            setIsPayrollUnlocked(false);
         } else if (passcodeChallenge?.type === 'admin') {
             setView('admin');
         }
@@ -123,7 +111,6 @@ export default function App() {
     const handleChangeStore = () => {
         setSelectedStore(null);
         setView('storeSelector');
-        setIsPayrollUnlocked(false);
     };
 
     const renderPage = () => {
@@ -134,7 +121,6 @@ export default function App() {
             case 'Daily Planner': return <DailyPlanner {...props} />;
             case 'Schedule': return <Schedule {...props} />;
             case 'STC': return <STC {...props} />;
-            case 'Payroll': return <Payroll {...props} />;
             case 'Daily Sales Log': return <DailySalesLog {...props} />;
             case 'Reports': return <Reports {...props} />;
             default: return <Dashboard {...props} />;
@@ -150,7 +136,7 @@ export default function App() {
         </>
     );
     
-    if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, setNotification, API_BASE_URL, allEmployees, refreshEmployees: fetchEmployees }} />;
+    if (view === 'admin') return <AdminPage onExit={() => setView('storeSelector')} {...{ t, language, setNotification, API_BASE_URL, allEmployees, refreshEmployees: fetchEmployees }} />;
     
     if (view === 'timeClock') return <TimeClock onExit={() => setView(selectedStore ? 'dashboard' : 'storeSelector')} {...{ t, setNotification, allEmployees, API_BASE_URL }} />;
 
@@ -170,7 +156,6 @@ export default function App() {
                 </header>
                 <div className="flex-1 overflow-y-auto p-6 bg-gray-900">{renderPage()}</div>
             </main>
-            {passcodeChallenge?.type === 'payroll' && <PasscodeModal correctPasscode="9160" onSuccess={handlePasscodeSuccess} onClose={() => setPasscodeChallenge(null)} t={t} />}
             {notification && <Notification {...notification} />}
         </div>
     );

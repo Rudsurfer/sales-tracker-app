@@ -5,7 +5,6 @@ import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
-// Helper function to convert decimal hours to HHh MMm format
 const decimalHoursToHM = (decimalHours) => {
     if (!decimalHours || decimalHours <= 0) return "0h 0m";
     const totalMinutes = Math.round(decimalHours * 60);
@@ -20,23 +19,24 @@ const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-2xl">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">{t.dailySalesObjectivesFor.replace('{name}', row.Name)}</h3>
+                    <h3 className="text-xl font-bold text-white">{t.dailyObjectivesFor} {row.Name}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {weekDays.map((day, index) => (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {DAYS_OF_WEEK.map((day, index) => (
                         <div key={day}>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">{day}</label>
-                            <input 
-                                type="number" 
-                                value={row.dailyObjectives?.[DAYS_OF_WEEK[index].toLowerCase()] || ''} 
-                                onChange={e => onRowChange(row.EmployeeID, 'dailyObjectives', e.target.value, DAYS_OF_WEEK[index].toLowerCase())} 
-                                className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" 
+                            <label className="block text-sm font-medium text-gray-300 mb-1">{weekDays[index]}</label>
+                            <input
+                                type="number"
+                                value={row.shifts[day]?.objective || ''}
+                                onChange={e => onRowChange(row.EmployeeID, 'shifts', { ...row.shifts, [day]: { ...row.shifts[day], objective: e.target.value } })}
+                                className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
+                                placeholder="$"
                             />
                         </div>
                     ))}
                 </div>
-                 <div className="flex justify-end mt-6">
+                <div className="flex justify-end mt-6">
                     <button onClick={onClose} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.done}</button>
                 </div>
             </div>
@@ -45,215 +45,153 @@ const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
 };
 
 const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentScheduleRows, t }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    if (!isOpen) return null;
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
 
-    const currentEmployeeIds = new Set(currentScheduleRows.map(r => r.EmployeeID));
-    const filteredEmployees = allEmployees.filter(emp => 
-        !currentEmployeeIds.has(emp.EmployeeID) && 
-        emp.Name.toLowerCase().includes(searchTerm.toLowerCase())
+    const availableEmployees = allEmployees.filter(emp => 
+        !currentScheduleRows.some(row => row.EmployeeID === emp.EmployeeID)
     );
+
+    const handleAdd = () => {
+        if (selectedEmployeeId) {
+            onAdd(parseInt(selectedEmployeeId, 10));
+            onClose();
+        }
+    };
+    
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-lg">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">{t.addGuestEmployee}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
-                </div>
-                <input 
-                    type="text" 
-                    placeholder={t.searchEmployee}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 mb-4"
-                />
-                <div className="max-h-80 overflow-y-auto">
-                    {filteredEmployees.map(emp => (
-                        <div key={emp.EmployeeID} className="flex justify-between items-center p-2 hover:bg-gray-700 rounded">
-                            <div>
-                                <p className="font-bold">{emp.Name}</p>
-                                <p className="text-sm text-gray-400">{emp.JobTitle} - {t.homeStore}: {emp.StoreID}</p>
-                            </div>
-                            <button onClick={() => { onAdd(emp); onClose(); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-sm">{t.addEmployee}</button>
-                        </div>
-                    ))}
-                </div>
+            <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
+                 <h3 className="text-xl font-bold text-white mb-4">{t.addGuestAssociate}</h3>
+                 <select onChange={e => setSelectedEmployeeId(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 mb-4">
+                    <option value="">{t.selectEmployee}</option>
+                    {availableEmployees.map(emp => <option key={emp.EmployeeID} value={emp.EmployeeID}>{emp.Name} ({emp.StoreID})</option>)}
+                 </select>
+                 <div className="flex justify-end gap-4">
+                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">{t.cancel}</button>
+                    <button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.add}</button>
+                 </div>
             </div>
         </div>
-    );
+    )
 };
 
 const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => {
     const [clockIn, setClockIn] = useState('');
     const [clockOut, setClockOut] = useState('');
-    const [reason, setReason] = useState('');
-
-    if (!isOpen) return null;
 
     const handleSave = () => {
-        if (!clockIn || !clockOut || !reason) {
-            alert(t.fillAllFields);
-            return;
-        }
-        onSave({ clockIn, clockOut, reason });
+        onSave(day, clockIn, clockOut);
         onClose();
     };
+    
+    if(!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">Time Adjustment for {employeeName} on {day}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
-                </div>
-                <div className="space-y-4">
+                 <h3 className="text-xl font-bold text-white mb-4">{t.adjustTimeFor} {employeeName} on {day}</h3>
+                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In Time (e.g., 9:00am)</label>
-                        <input type="text" value={clockIn} onChange={e => setClockIn(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                        <label className="text-sm text-gray-400">{t.clockIn}</label>
+                        <input type="datetime-local" value={clockIn} onChange={e => setClockIn(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 mt-1" />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out Time (e.g., 5:30pm)</label>
-                        <input type="text" value={clockOut} onChange={e => setClockOut(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                     <div>
+                        <label className="text-sm text-gray-400">{t.clockOut}</label>
+                        <input type="datetime-local" value={clockOut} onChange={e => setClockOut(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 mt-1" />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Reason for Adjustment</label>
-                        <textarea value={reason} onChange={e => setReason(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" rows="3"></textarea>
-                    </div>
-                </div>
-                <div className="flex justify-end mt-6 space-x-4">
+                 </div>
+                 <div className="flex justify-end gap-4 mt-6">
                     <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">{t.cancel}</button>
-                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.saveChanges}</button>
-                </div>
+                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.save}</button>
+                 </div>
             </div>
         </div>
     );
 };
 
-export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
-    const [schedule, setSchedule] = useState(null);
+export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t, language }) => {
+    const [schedule, setSchedule] = useState({ rows: [], isLocked: false });
     const [isLoading, setIsLoading] = useState(true);
-    const [editingObjectivesFor, setEditingObjectivesFor] = useState(null);
     const [saveState, setSaveState] = useState('idle');
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [editingObjectivesFor, setEditingObjectivesFor] = useState(null);
     const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
-    const [editingCell, setEditingCell] = useState(null);
-    const [timeAdjustmentData, setTimeAdjustmentData] = useState(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
+    const [timeAdjustmentData, setTimeAdjustmentData] = useState(null);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
-
-    const fetchSchedule = async () => {
-        setIsLoading(true);
-        try {
-            const [scheduleRes, timeLogsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
-                fetch(`${API_BASE_URL}/timelog/${selectedStore}/${currentWeek}/${currentYear}`)
-            ]);
-
-            let scheduleData;
-            if (scheduleRes.ok) {
-                scheduleData = await scheduleRes.json();
-                 if (scheduleData.status === 'not_found') {
-                    const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
-                    const newScheduleRows = storeEmployees.map(emp => ({
-                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
-                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
-                    }));
-                    scheduleData = { rows: newScheduleRows, isLocked: false };
-                }
-            } else {
-                const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
-                const newScheduleRows = storeEmployees.map(emp => ({
-                    EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
-                    objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
-                }));
-                scheduleData = { rows: newScheduleRows, isLocked: false };
-            }
-            
-            const timeLogs = await timeLogsRes.json();
-
-            scheduleData.rows.forEach(row => {
-                const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID);
-                const dailyHours = {};
-                employeeLogs.forEach(log => {
-                    if (log.ClockIn && log.ClockOut) {
-                        const clockInDate = new Date(log.ClockIn);
-                        const clockOutDate = new Date(log.ClockOut);
-                        const day = DAYS_OF_WEEK[clockInDate.getDay()].toLowerCase();
-                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
-                        if (duration > 5) {
-                            duration -= 0.5;
-                        }
-                        dailyHours[day] = (dailyHours[day] || 0) + duration;
-                    }
-                });
-                row.actualHours = dailyHours;
-            });
-
-            const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
-            const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
-            storeEmployees.forEach(emp => {
-                if (!scheduleEmployeeIds.has(emp.EmployeeID)) {
-                    scheduleData.rows.push({
-                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
-                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
-                    });
-                }
-            });
-
-            setSchedule(scheduleData);
-
-        } catch (error) {
-            console.error("Error fetching schedule:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const printRef = useRef();
 
     useEffect(() => {
-        fetchSchedule();
-    }, [selectedStore, currentWeek, currentYear, allEmployees]);
-    
-    const handleRowChange = (id, field, value, day) => {
-        const newRows = schedule.rows.map(row => {
-            if (row.EmployeeID === id) {
-                if (day) {
-                    const newFieldData = { ...row[field], [day]: value };
-                    return { ...row, [field]: newFieldData };
+        const fetchSchedule = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`);
+                if (response.ok) {
+                    const data = await response.json();
+                     if (data.status === 'not_found') {
+                        const homeStoreEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+                        setSchedule({ 
+                            rows: homeStoreEmployees.map(e => ({...e, shifts: {}, actualHours: {}})),
+                            isLocked: false
+                        });
+                    } else {
+                        setSchedule(data);
+                    }
                 }
-                return { ...row, [field]: value };
+            } catch (error) {
+                console.error("Error fetching schedule:", error);
+            } finally {
+                setIsLoading(false);
             }
-            return row;
-        });
-        setSchedule(prev => ({ ...prev, rows: newRows }));
-    };
-
-    const handleAddRow = () => {
-        const newRow = { EmployeeID: `new_${Date.now()}`, Name: '', PositionID: '', JobTitle: JOB_TITLES[0], objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} };
-        setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
-    };
-
-    const handleAddGuest = (employee) => {
-        const newRow = { 
-            EmployeeID: employee.EmployeeID, 
-            Name: employee.Name, 
-            PositionID: employee.PositionID, 
-            JobTitle: employee.JobTitle, 
-            objective: 0, 
-            shifts: {}, 
-            actualHours: {}, 
-            dailyObjectives: {},
-            isGuest: true,
-            homeStore: employee.StoreID
         };
-        setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
+
+        const fetchTimeLogs = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/timelog/${selectedStore}/${currentWeek}/${currentYear}`);
+                if (response.ok) {
+                    const timeLogs = await response.json();
+                    
+                    setSchedule(currentSchedule => {
+                        const newRows = currentSchedule.rows.map(row => {
+                            const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID && log.ClockIn && log.ClockOut);
+                            const actualHoursByDay = {};
+                            
+                            employeeLogs.forEach(log => {
+                                const clockInDate = new Date(log.ClockIn);
+                                const dayName = clockInDate.toLocaleDateString('en-US', { weekday: 'long' });
+                                const duration = (new Date(log.ClockOut) - clockInDate) / (1000 * 60 * 60);
+                                actualHoursByDay[dayName] = (actualHoursByDay[dayName] || 0) + duration;
+                            });
+
+                            return { ...row, actualHours: actualHoursByDay };
+                        });
+                        return { ...currentSchedule, rows: newRows };
+                    });
+                }
+            } catch (error) {
+                 console.error("Error fetching time logs:", error);
+            }
+        };
+
+        fetchSchedule().then(() => {
+            if (!schedule.isLocked) {
+                fetchTimeLogs();
+            }
+        });
+
+    }, [selectedStore, currentWeek, currentYear, API_BASE_URL, allEmployees]);
+
+    const handleRowChange = (id, field, value) => {
+        setSchedule(s => ({
+            ...s,
+            rows: s.rows.map(row => (row.EmployeeID === id ? { ...row, [field]: value } : row))
+        }));
     };
 
-    const handleRemoveRow = (id) => {
-        setSchedule(prev => ({...prev, rows: prev.rows.filter(row => row.EmployeeID !== id)}));
-    };
-
-    const executeSaveSchedule = async (lockWeek = false) => {
+    const handleSave = async (isFinalizing = false) => {
+        if(schedule.isLocked) return;
         setSaveState('saving');
         try {
             await fetch(`${API_BASE_URL}/schedule`, {
@@ -263,53 +201,56 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     storeId: selectedStore,
                     week: currentWeek,
                     year: currentYear,
-                    isLocked: lockWeek || schedule.isLocked,
-                    rows: schedule.rows
+                    rows: schedule.rows,
+                    isLocked: isFinalizing
                 })
             });
             setSaveState('saved');
-            setNotification({ message: t.scheduleSavedSuccess, type: 'success' });
+            if(isFinalizing) {
+                 setSchedule(s => ({...s, isLocked: true }));
+                 setNotification({ message: t.scheduleFinalized, type: 'success' });
+            } else {
+                setNotification({ message: t.scheduleSaved, type: 'success' });
+            }
             setTimeout(() => setSaveState('idle'), 2000);
         } catch (error) {
             console.error("Error saving schedule:", error);
             setNotification({ message: t.errorSavingSchedule, type: 'error' });
             setSaveState('idle');
         }
-        setIsConfirmModalOpen(false);
     };
     
-    const handleFinalizeWeek = () => setIsConfirmModalOpen(true);
-    const handleConfirmFinalize = () => {
-        executeSaveSchedule(true);
-        setSchedule(prev => ({...prev, isLocked: true}));
-        setIsConfirmModalOpen(false);
+    const handleAddGuest = (employeeId) => {
+        const employeeToAdd = allEmployees.find(e => e.EmployeeID === employeeId);
+        if(employeeToAdd) {
+            setSchedule(s => ({...s, rows: [...s.rows, {...employeeToAdd, shifts: {}, actualHours: {}}] }));
+        }
     };
 
-    const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => {
-        if (!timeAdjustmentData) return;
-        const { row, dayIndex } = timeAdjustmentData;
-        
-        const weekStartDate = new Date(currentDate);
-        weekStartDate.setDate(currentDate.getDate() - currentDate.getDay());
-        const adjustmentDate = new Date(weekStartDate);
-        adjustmentDate.setDate(weekStartDate.getDate() + dayIndex);
+    const handleRemoveRow = (id) => {
+         setSchedule(s => ({...s, rows: s.rows.filter(row => row.EmployeeID !== id)}));
+    };
+    
+    const handlePrint = () => window.print();
 
-        const parseTime = (timeStr) => {
-            const isPm = timeStr.toLowerCase().includes('pm');
-            const isAm = timeStr.toLowerCase().includes('am');
-            let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(Number);
-            minutes = minutes || 0;
-            if (isPm && hours < 12) hours += 12;
-            if (isAm && hours === 12) hours = 0;
-            return { hours, minutes };
-        };
+    const handleFinalizeClick = () => {
+        if(!schedule.isLocked) {
+            setIsManagerPasscodeOpen(true);
+        }
+    };
 
-        const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
-        const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
+    const handleManagerPasscodeSuccess = () => {
+        setIsManagerPasscodeOpen(false);
+        setIsConfirmModalOpen(true);
+    };
 
-        const clockInDate = new Date(adjustmentDate.getFullYear(), adjustmentDate.getMonth(), adjustmentDate.getDate(), inHours, inMinutes);
-        const clockOutDate = new Date(adjustmentDate.getFullYear(), adjustmentDate.getMonth(), adjustmentDate.getDate(), outHours, outMinutes);
+    const handleConfirmFinalize = () => {
+        setIsConfirmModalOpen(false);
+        handleSave(true);
+    };
 
+    const handleTimeAdjustmentSave = async (day, clockIn, clockOut) => {
+        const { row } = timeAdjustmentData;
         try {
             await fetch(`${API_BASE_URL}/timelog/adjust`, {
                 method: 'POST',
@@ -317,150 +258,99 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 body: JSON.stringify({
                     employeeId: row.EmployeeID,
                     storeId: selectedStore,
-                    clockIn: clockInDate.toISOString(),
-                    clockOut: clockOutDate.toISOString(),
                     week: currentWeek,
                     year: currentYear,
-                    reason: reason,
+                    clockIn,
+                    clockOut
                 })
             });
-            setNotification({ message: "Time adjustment saved.", type: 'success' });
-            fetchSchedule(); // Re-fetch schedule to update actual hours
+            setNotification({ message: t.timeAdjustedSuccess, type: 'success' });
+            setTimeAdjustmentData(null);
         } catch (error) {
-            console.error("Error saving time adjustment:", error);
-            setNotification({ message: "Error saving adjustment.", type: 'error' });
+            setNotification({ message: t.errorAdjustingTime, type: 'error' });
         }
     };
-    
-    const handleManagerPasscodeSuccess = () => {
-        setIsManagerPasscodeOpen(false);
-        // Now open the time adjustment modal
-        // This assumes timeAdjustmentData is already set with the row and day info
-    };
 
-    if (isLoading || !schedule) {
+    if (isLoading) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
-
+    
     return (
         <>
-            <style>{`
-                @media print {
-                    body * { visibility: hidden; }
-                    #printable-schedule, #printable-schedule * { visibility: visible; }
-                    #printable-schedule { position: absolute; left: 0; top: 0; width: 100%; }
-                    .no-print { display: none; }
-                }
-            `}</style>
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="flex justify-end mb-4 gap-4 no-print">
-                    <button onClick={() => window.print()} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                        <Printer size={18} className="mr-2"/> {t.printSchedule}
-                    </button>
-                    {schedule.isLocked ? (
-                        <span className="flex items-center bg-gray-700 text-green-400 font-bold py-2 px-4 rounded-lg">
-                            <Lock size={18} className="mr-2"/> {t.weekLocked}
-                        </span>
-                    ) : (
-                        <button onClick={handleFinalizeWeek} className="flex items-center bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
-                            <Unlock size={18} className="mr-2"/> {t.finalizeWeek}
+            <div className="space-y-6" ref={printRef}>
+                 <div className="flex justify-between items-center no-print">
+                    <div className="flex items-center gap-4">
+                        <button onClick={handleFinalizeClick} disabled={schedule.isLocked} className="flex items-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500">
+                           {schedule.isLocked ? <Lock size={18} className="mr-2" /> : <Unlock size={18} className="mr-2" />}
+                           {schedule.isLocked ? t.finalized : t.finalizeWeek}
                         </button>
-                    )}
-                    <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setIsGuestModalOpen(true)} disabled={schedule.isLocked} className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500">
+                            <UserPlus size={18} className="mr-2"/> {t.addGuestAssociate}
+                        </button>
+                        <button onClick={handlePrint} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"><Printer size={18} className="mr-2" /> {t.print}</button>
+                        <SaveButton onClick={() => handleSave(false)} saveState={saveState} text={t.saveSchedule} />
+                    </div>
                 </div>
-                <div id="printable-schedule" className="overflow-x-auto">
-                    <h2 className="text-xl font-bold mb-4 print-only">{t.schedule} - {t.store} {selectedStore} - {t.currentWeek} {currentWeek}, {currentYear}</h2>
+                <div className="overflow-x-auto bg-gray-800 p-4 rounded-lg shadow-lg">
                     <table className="w-full text-sm text-left text-gray-400">
-                        <thead className="text-xs text-gray-300 uppercase bg-gray-700">
+                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.employeeId}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.jobTitleDescription}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
-                                {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalSchedHrs}</th>
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalActualHrs}</th>
-                                <th scope="col" className="px-4 py-3 align-top no-print">{t.actions}</th>
+                                <th className="px-4 py-3">{t.associate}</th>
+                                {weekDays.map(day => <th key={day} className="px-4 py-3 text-center">{day}</th>)}
+                                <th className="px-4 py-3 text-center">{t.totalHours}</th>
+                                <th className="px-4 py-3 text-center no-print">{t.actions}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {schedule.rows.map(row => {
-                                const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-                                const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                            {schedule.rows?.map(row => {
+                                const { totalScheduled, totalActual } = Object.values(row.shifts || {}).reduce(
+                                    (acc, shift) => {
+                                        acc.totalScheduled += shift.duration || 0;
+                                        return acc;
+                                    }, { totalScheduled: 0, totalActual: 0 }
+                                );
+                                const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + h, 0);
+
                                 return (
-                                    <tr key={row.EmployeeID}>
-                                        <td className="px-4 py-2 print-hide"><input type="text" placeholder="ID" value={row.PositionID || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                        <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.Name || ''} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                        <td className="px-4 py-2 print-hide">
-                                            <select value={row.JobTitle} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1">
-                                                {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
-                                            </select>
+                                    <tr key={row.EmployeeID} className="bg-gray-800 border-b border-gray-700">
+                                        <td className="px-4 py-2 font-medium text-white">{row.Name} <span className="text-xs text-gray-500">({row.JobTitle})</span></td>
+                                        {DAYS_OF_WEEK.map(day => (
+                                            <td key={day} className="px-1 py-1 align-top">
+                                                <input
+                                                    type="text"
+                                                    value={row.shifts[day]?.raw || ''}
+                                                    onChange={e => handleRowChange(row.EmployeeID, 'shifts', { ...row.shifts, [day]: parseShift(e.target.value) })}
+                                                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center"
+                                                    placeholder="e.g. 9-5"
+                                                    disabled={schedule.isLocked}
+                                                />
+                                                <div className="text-xs text-center mt-1">
+                                                    <span className="text-blue-400">{decimalHoursToHM(row.shifts[day]?.duration)}</span>
+                                                    {row.actualHours?.[day] && <span className="text-green-400 ml-2">{decimalHoursToHM(row.actualHours[day])}</span>}
+                                                </div>
+                                                 {schedule.isLocked && <button onClick={() => setTimeAdjustmentData({row, day})} className="text-yellow-500 hover:text-yellow-400 text-xs w-full mt-1"><Edit2 size={12} className="inline mr-1"/>{t.adjust}</button>}
+                                            </td>
+                                        ))}
+                                        <td className="px-4 py-2 text-center font-bold">
+                                            <div className="text-blue-400">{decimalHoursToHM(totalScheduled)}</div>
+                                            <div className="text-green-40oL">{decimalHoursToHM(totalActualHours)}</div>
                                         </td>
-                                        <td className="px-4 py-2">
-                                            <div className="flex items-center space-x-2">
-                                                <input type="number" placeholder={t.objective} value={row.objective || 0} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" />
-                                                <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300 no-print"><Target size={18}/></button>
+                                        <td className="px-4 py-2 text-center no-print">
+                                            <div className="flex justify-center gap-2">
+                                                <button onClick={() => setEditingObjectivesFor(row)} className="text-yellow-500 hover:text-yellow-400"><Target size={18}/></button>
+                                                {!schedule.isLocked && <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18}/></button>}
                                             </div>
                                         </td>
-                                        {DAYS_OF_WEEK.map((day, dayIndex) => {
-                                            const dayKey = day.toLowerCase();
-                                            const shiftValue = row.shifts?.[dayKey] || '';
-                                            const isVacation = shiftValue.toLowerCase().startsWith('vac');
-                                            const isEditing = editingCell === `${row.EmployeeID}-${dayKey}`;
-                                            return (
-                                            <td key={day} className="px-2 py-2">
-                                                <div className="flex flex-col space-y-1">
-                                                    <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
-                                                    <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
-                                                    <div className="relative">
-                                                        {isEditing ? (
-                                                            <input 
-                                                                type="number" 
-                                                                value={row.actualHours?.[dayKey] || ''} 
-                                                                onBlur={() => setEditingCell(null)}
-                                                                onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
-                                                                autoFocus
-                                                                className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} 
-                                                                step="0.25" 
-                                                            />
-                                                        ) : (
-                                                            <div 
-                                                                onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
-                                                                className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
-                                                            >
-                                                                {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
-                                                            </div>
-                                                        )}
-                                                        {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        )})}
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalScheduledHours)}</td>
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
-                                        <td className="px-4 py-2 text-center no-print">
-                                            <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
-                                        </td>
                                     </tr>
-                                )
+                                );
                             })}
                         </tbody>
                     </table>
-                    <div className="mt-4 flex gap-4 no-print">
-                        <button onClick={handleAddRow}
-                                className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <PlusCircle size={20} className="mr-2" />
-                            {t.addToSchedule}
-                        </button>
-                        <button onClick={() => setIsGuestModalOpen(true)}
-                                className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <UserPlus size={20} className="mr-2" />
-                            {t.addGuestEmployee}
-                        </button>
-                    </div>
                 </div>
             </div>
-            {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
+            {editingObjectivesFor && <DailyObjectiveModal row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} t={t} language={language}/>}
             <AddGuestAssociateModal 
                 isOpen={isGuestModalOpen}
                 onClose={() => setIsGuestModalOpen(false)}
