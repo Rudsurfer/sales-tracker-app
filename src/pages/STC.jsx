@@ -30,29 +30,23 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
         fetchStcData();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
-    const dayData = useMemo(() => {
-        const dayKey = DAYS_OF_WEEK.find(d => t[d.toLowerCase()] === selectedDay || d === selectedDay);
-        return stcData.days[dayKey] || {};
-    }, [stcData, selectedDay, t]);
-    
-
     const handleChange = (hour, field, value) => {
-        const dayKey = DAYS_OF_WEEK.find(d => t[d.toLowerCase()] === selectedDay || d === selectedDay);
+        const dayKey = selectedDay.toLowerCase();
         setStcData(prev => ({
             ...prev,
             days: {
                 ...prev.days,
                 [dayKey]: {
-                    ...prev.days[dayKey],
+                    ...prev.days?.[dayKey],
                     [hour]: {
-                        ...prev.days[dayKey]?.[hour],
+                        ...prev.days?.[dayKey]?.[hour],
                         [field]: Number(value)
                     }
                 }
             }
         }));
     };
-    
+
     const handleSave = async () => {
         setSaveState('saving');
         try {
@@ -67,7 +61,7 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                 })
             });
             setSaveState('saved');
-            setNotification({ message: t.stcDataSaved, type: 'success' });
+            setNotification({ message: t.stcDataSavedSuccess, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
         } catch (error) {
             console.error("Error saving STC data:", error);
@@ -76,18 +70,19 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
         }
         setIsConfirmModalOpen(false);
     };
-
+    
+    const dayKey = selectedDay.toLowerCase();
     const totals = useMemo(() => {
-        return Object.values(dayData).reduce((acc, hour) => {
-            acc.traffic += hour.traffic || 0;
-            acc.transactions += hour.transactions || 0;
-            acc.employees += hour.employees || 0;
-            return acc;
-        }, { traffic: 0, transactions: 0, employees: 0 });
-    }, [dayData]);
+        const dayData = stcData.days?.[dayKey] || {};
+        return {
+            traffic: Object.values(dayData).reduce((sum, h) => sum + (h.traffic || 0), 0),
+            transactions: Object.values(dayData).reduce((sum, h) => sum + (h.transactions || 0), 0),
+            employees: Object.values(dayData).reduce((sum, h) => sum + (h.employees || 0), 0),
+        };
+    }, [stcData, dayKey]);
     
     const conversion = totals.traffic > 0 ? (totals.transactions / totals.traffic) * 100 : 0;
-    
+
     if (isLoading) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
@@ -97,20 +92,20 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
             <div className="flex justify-between items-center">
                 <div className="flex space-x-1 bg-gray-800 p-1 rounded-lg">
                     {weekDays.map((day, index) => (
-                         <button key={day} onClick={() => setSelectedDay(DAYS_OF_WEEK[index])} className={`px-4 py-2 rounded-md text-sm font-bold ${selectedDay === DAYS_OF_WEEK[index] ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
+                        <button key={day} onClick={() => setSelectedDay(DAYS_OF_WEEK[index])} className={`px-4 py-2 rounded-md text-sm font-bold ${selectedDay === DAYS_OF_WEEK[index] ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
                             {day}
                         </button>
                     ))}
                 </div>
-                 <SaveButton onClick={() => setIsConfirmModalOpen(true)} saveState={saveState} text={t.saveDay} />
+                 <SaveButton onClick={() => setIsConfirmModalOpen(true)} saveState={saveState} text="Save STC" />
             </div>
-             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-center text-gray-400">
+                    <table className="w-full text-sm text-center">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
                                 <th className="px-4 py-3">{t.hour}</th>
-                                <th className="px-4 py-3">{t.traffic}</th>
+                                <th className="px-4 py-3">{t.footTraffic}</th>
                                 <th className="px-4 py-3">{t.transactions}</th>
                                 <th className="px-4 py-3">{t.employees}</th>
                                 <th className="px-4 py-3">{t.conversion}</th>
@@ -118,13 +113,13 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                         </thead>
                         <tbody>
                             {OPERATING_HOURS.map(hour => {
-                                const hourData = dayData[hour] || {};
-                                const conversion = (hourData.traffic || 0) > 0 ? ((hourData.transactions || 0) / hourData.traffic) * 100 : 0;
+                                const hourData = stcData.days?.[dayKey]?.[hour] || {};
+                                const conversion = (hourData.traffic || 0) > 0 ? ((hourData.transactions || 0) / (hourData.traffic || 0)) * 100 : 0;
                                 return (
-                                    <tr key={hour} className="bg-gray-800 border-b border-gray-700">
-                                        <td className="px-4 py-2 font-medium">{hour}:00 - {hour}:59</td>
-                                        <td><input type="number" value={hourData.traffic || ''} onChange={e => handleChange(hour, 'traffic', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
-                                        <td><input type="number" readOnly value={hourData.transactions || ''} className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
+                                    <tr key={hour} className="border-b border-gray-700">
+                                        <td className="px-4 py-2 font-medium">{hour}</td>
+                                        <td><input type="number" value={hourData.traffic || ''} readOnly className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
+                                        <td><input type="number" value={hourData.transactions || ''} onChange={e => handleChange(hour, 'transactions', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td><input type="number" value={hourData.employees || ''} onChange={e => handleChange(hour, 'employees', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td className="font-bold">{conversion.toFixed(2)}%</td>
                                     </tr>
