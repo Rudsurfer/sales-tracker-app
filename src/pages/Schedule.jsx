@@ -305,12 +305,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                         </thead>
                         <tbody>
                             {schedule.rows?.map(row => {
-                                const { totalScheduled, totalActual } = Object.values(row.shifts || {}).reduce(
-                                    (acc, shift) => {
-                                        acc.totalScheduled += shift.duration || 0;
-                                        return acc;
-                                    }, { totalScheduled: 0, totalActual: 0 }
-                                );
+                                const totalScheduled = Object.values(row.shifts || {}).reduce((acc, shift) => acc + (shift.duration || 0), 0);
                                 const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + h, 0);
 
                                 return (
