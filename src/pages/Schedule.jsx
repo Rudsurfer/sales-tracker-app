@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PlusCircle, Trash2, Target, X, UserPlus, Printer, Lock, Unlock, Edit2 } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { PasscodeModal } from '../components/PasscodeModal';
-import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
+import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR } from '../constants';
 import { parseShift } from '../utils/helpers';
 
 const decimalHoursToHM = (decimalHours) => {
@@ -335,7 +335,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                         ))}
                                         <td className="px-4 py-2 text-center font-bold">
                                             <div className="text-blue-400">{decimalHoursToHM(totalScheduled)}</div>
-                                            <div className="text-green-40oL">{decimalHoursToHM(totalActualHours)}</div>
+                                            <div className="text-green-400">{decimalHoursToHM(totalActualHours)}</div>
                                         </td>
                                         <td className="px-4 py-2 text-center no-print">
                                             <div className="flex justify-center gap-2">
