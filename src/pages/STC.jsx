@@ -120,9 +120,9 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                                 const hourData = dayData[hour] || {};
                                 const conversion = (hourData.traffic || 0) > 0 ? ((hourData.transactions || 0) / hourData.traffic) * 100 : 0;
                                 return (
-                                    <tr key={hour} className="bg-gray-800 border-b border-gray-700">
-                                        <td className="px-4 py-2 font-medium">{hour}:00 - {hour}:59</td>
-                                        <td><input type="number" value={hourData.traffic || ''} onChange={e => handleChange(hour, 'traffic', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
+                                     <tr key={hour} className="border-b border-gray-700">
+                                        <td className="px-4 py-2 font-medium">{hour}</td>
+                                        <td><input type="number" value={hourData.traffic || ''} readOnly className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
                                         <td><input type="number" readOnly value={hourData.transactions || ''} className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
                                         <td><input type="number" value={hourData.employees || ''} onChange={e => handleChange(hour, 'employees', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td className="font-bold">{conversion.toFixed(2)}%</td>
@@ -145,4 +145,5 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
             <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleSave} title={t.confirmSaveStc} t={t}><p>{t.confirmSaveStcMsg.replace('{day}', selectedDay)}</p></ConfirmationModal>
         </div>
     );
+
 };
