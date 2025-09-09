@@ -34,6 +34,7 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
         const dayKey = DAYS_OF_WEEK.find(d => t[d.toLowerCase()] === selectedDay || d === selectedDay);
         return stcData.days[dayKey] || {};
     }, [stcData, selectedDay, t]);
+    
 
     const handleChange = (hour, field, value) => {
         const dayKey = DAYS_OF_WEEK.find(d => t[d.toLowerCase()] === selectedDay || d === selectedDay);
@@ -95,8 +96,8 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div className="flex space-x-1 bg-gray-800 p-1 rounded-lg">
-                    {weekDays.map(day => (
-                        <button key={day} onClick={() => setSelectedDay(day)} className={`px-4 py-2 rounded-md text-sm font-bold ${selectedDay === day ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
+                    {weekDays.map((day, index) => (
+                         <button key={day} onClick={() => setSelectedDay(DAYS_OF_WEEK[index])} className={`px-4 py-2 rounded-md text-sm font-bold ${selectedDay === DAYS_OF_WEEK[index] ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
                             {day}
                         </button>
                     ))}
@@ -109,7 +110,7 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
                                 <th className="px-4 py-3">{t.hour}</th>
-                                <th className="px-4 py-3">{t.footTraffic}</th>
+                                <th className="px-4 py-3">{t.traffic}</th>
                                 <th className="px-4 py-3">{t.transactions}</th>
                                 <th className="px-4 py-3">{t.employees}</th>
                                 <th className="px-4 py-3">{t.conversion}</th>
@@ -120,9 +121,9 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                                 const hourData = dayData[hour] || {};
                                 const conversion = (hourData.traffic || 0) > 0 ? ((hourData.transactions || 0) / hourData.traffic) * 100 : 0;
                                 return (
-                                     <tr key={hour} className="border-b border-gray-700">
-                                        <td className="px-4 py-2 font-medium">{hour}</td>
-                                        <td><input type="number" value={hourData.traffic || ''} readOnly className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
+                                    <tr key={hour} className="bg-gray-800 border-b border-gray-700">
+                                        <td className="px-4 py-2 font-medium">{hour}:00 - {hour}:59</td>
+                                        <td><input type="number" value={hourData.traffic || ''} onChange={e => handleChange(hour, 'traffic', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td><input type="number" readOnly value={hourData.transactions || ''} className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
                                         <td><input type="number" value={hourData.employees || ''} onChange={e => handleChange(hour, 'employees', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
                                         <td className="font-bold">{conversion.toFixed(2)}%</td>
@@ -145,6 +146,4 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
             <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleSave} title={t.confirmSaveStc} t={t}><p>{t.confirmSaveStcMsg.replace('{day}', selectedDay)}</p></ConfirmationModal>
         </div>
     );
-
 };
-
