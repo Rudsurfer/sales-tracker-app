@@ -1,28 +1,30 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, OPERATING_HOURS } from '../constants';
 
 export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t, language }) => {
-    const [stcData, setStcData] = useState({ days: {} });
-    const [isLoading, setIsLoading] = useState(true);
-    const [selectedDay, setSelectedDay] = useState(DAYS_OF_WEEK[new Date().getDay()]);
+    const [stcData, setStcData] = useState({ HourlyData: {} });
+    const [activeDay, setActiveDay] = useState(new Date().getDay());
     const [saveState, setSaveState] = useState('idle');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
     useEffect(() => {
         const fetchStcData = async () => {
+            if (!selectedStore) return;
             setIsLoading(true);
             try {
                 const response = await fetch(`${API_BASE_URL}/stc/${selectedStore}/${currentWeek}/${currentYear}`);
                 if (response.ok) {
                     const data = await response.json();
-                    setStcData({ days: data.HourlyData || {} });
+                    setStcData(data);
                 } else {
-                    setStcData({ days: {} });
+                    setStcData({ HourlyData: {} });
                 }
             } catch (error) {
                 console.error("Error fetching STC data:", error);
+                setStcData({ HourlyData: {} });
             } finally {
                 setIsLoading(false);
             }
@@ -30,24 +32,25 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
         fetchStcData();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
-    const handleChange = (hour, field, value) => {
-        const dayKey = selectedDay.toLowerCase();
+    const handleDataChange = (hour, field, value) => {
+        const dayKey = DAYS_OF_WEEK[activeDay].toLowerCase();
+        const updatedDayData = {
+            ...(stcData.HourlyData[dayKey] || {}),
+            [hour]: {
+                ...(stcData.HourlyData[dayKey]?.[hour] || {}),
+                [field]: Number(value)
+            }
+        };
         setStcData(prev => ({
             ...prev,
-            days: {
-                ...prev.days,
-                [dayKey]: {
-                    ...prev.days?.[dayKey],
-                    [hour]: {
-                        ...prev.days?.[dayKey]?.[hour],
-                        [field]: Number(value)
-                    }
-                }
+            HourlyData: {
+                ...prev.HourlyData,
+                [dayKey]: updatedDayData
             }
         }));
     };
 
-    const handleSave = async () => {
+    const executeSaveChanges = async () => {
         setSaveState('saving');
         try {
             await fetch(`${API_BASE_URL}/stc`, {
@@ -57,88 +60,102 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                     storeId: selectedStore,
                     week: currentWeek,
                     year: currentYear,
-                    hourlyData: stcData.days
+                    hourlyData: stcData.HourlyData,
                 })
             });
             setSaveState('saved');
             setNotification({ message: t.stcDataSavedSuccess, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
         } catch (error) {
-            console.error("Error saving STC data:", error);
+            console.error("Error saving STC data: ", error);
             setNotification({ message: t.errorSavingStc, type: 'error' });
             setSaveState('idle');
         }
         setIsConfirmModalOpen(false);
     };
     
-    const dayKey = selectedDay.toLowerCase();
-    const totals = useMemo(() => {
-        const dayData = stcData.days?.[dayKey] || {};
-        return {
-            traffic: Object.values(dayData).reduce((sum, h) => sum + (h.traffic || 0), 0),
-            transactions: Object.values(dayData).reduce((sum, h) => sum + (h.transactions || 0), 0),
-            employees: Object.values(dayData).reduce((sum, h) => sum + (h.employees || 0), 0),
-        };
-    }, [stcData, dayKey]);
-    
-    const conversion = totals.traffic > 0 ? (totals.transactions / totals.traffic) * 100 : 0;
+    const calculateConversion = (hourData) => {
+        if (!hourData || !hourData.traffic || hourData.traffic === 0) return '0.00%';
+        const conversion = (hourData.transactions || 0) / hourData.traffic * 100;
+        return `${conversion.toFixed(2)}%`;
+    };
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div className="flex space-x-1 bg-gray-800 p-1 rounded-lg">
-                    {weekDays.map((day, index) => (
-                        <button key={day} onClick={() => setSelectedDay(DAYS_OF_WEEK[index])} className={`px-4 py-2 rounded-md text-sm font-bold ${selectedDay === DAYS_OF_WEEK[index] ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
-                            {day}
-                        </button>
-                    ))}
-                </div>
-                 <SaveButton onClick={() => setIsConfirmModalOpen(true)} saveState={saveState} text="Save STC" />
-            </div>
+        <>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex border-b border-gray-700">
+                        {weekDays.map((day, index) => (
+                            <button key={day} onClick={() => setActiveDay(index)}
+                                    className={`py-2 px-4 text-sm font-medium transition-colors duration-200 ${activeDay === index ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400 hover:text-white'}`}>
+                                {day}
+                            </button>
+                        ))}
+                    </div>
+                    <SaveButton onClick={() => setIsConfirmModalOpen(true)} saveState={saveState} text={t.saveChanges} />
+                </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-center">
+                    <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
-                                <th className="px-4 py-3">{t.hour}</th>
-                                <th className="px-4 py-3">{t.footTraffic}</th>
-                                <th className="px-4 py-3">{t.transactions}</th>
-                                <th className="px-4 py-3">{t.employees}</th>
-                                <th className="px-4 py-3">{t.conversion}</th>
+                                <th scope="col" className="px-6 py-3">{t.hour}</th>
+                                <th scope="col" className="px-6 py-3">{t.footTraffic}</th>
+                                <th scope="col" className="px-6 py-3">{t.transactions}</th>
+                                <th scope="col" className="px-6 py-3">{t.employees}</th>
+                                <th scope="col" className="px-6 py-3">{t.conversion}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {OPERATING_HOURS.map(hour => {
-                                const hourData = stcData.days?.[dayKey]?.[hour] || {};
-                                const conversion = (hourData.traffic || 0) > 0 ? ((hourData.transactions || 0) / (hourData.traffic || 0)) * 100 : 0;
+                                const dayKey = DAYS_OF_WEEK[activeDay].toLowerCase();
+                                const currentHourData = stcData.HourlyData?.[dayKey]?.[hour] || {};
                                 return (
-                                    <tr key={hour} className="border-b border-gray-700">
-                                        <td className="px-4 py-2 font-medium">{hour}</td>
-                                        <td><input type="number" value={hourData.traffic || ''} readOnly className="w-24 bg-gray-700 text-center rounded-md p-1" /></td>
-                                        <td><input type="number" value={hourData.transactions || ''} onChange={e => handleChange(hour, 'transactions', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
-                                        <td><input type="number" value={hourData.employees || ''} onChange={e => handleChange(hour, 'employees', e.target.value)} className="w-24 bg-gray-900 text-center rounded-md p-1" /></td>
-                                        <td className="font-bold">{conversion.toFixed(2)}%</td>
+                                    <tr key={hour}>
+                                        <td className="px-6 py-4 font-medium text-white">{hour}</td>
+                                        <td className="px-6 py-4">
+                                            <input 
+                                                type="number" 
+                                                value={currentHourData.traffic || ''} 
+                                                readOnly 
+                                                className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center" 
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <input 
+                                                type="number" 
+                                                value={currentHourData.transactions || ''} 
+                                                readOnly 
+                                                className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center" 
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <input 
+                                                type="number" 
+                                                value={currentHourData.employees || ''} 
+                                                onChange={(e) => handleDataChange(hour, 'employees', e.target.value)} 
+                                                className="w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center" 
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 font-bold text-white">{calculateConversion(currentHourData)}</td>
                                     </tr>
-                                )
+                                );
                             })}
                         </tbody>
-                        <tfoot className="text-white font-bold">
-                            <tr>
-                                <td className="px-4 py-3">{t.totals}</td>
-                                <td className="px-4 py-3">{totals.traffic}</td>
-                                <td className="px-4 py-3">{totals.transactions}</td>
-                                <td className="px-4 py-3">{totals.employees}</td>
-                                <td className="px-4 py-3">{conversion.toFixed(2)}%</td>
-                            </tr>
-                        </tfoot>
                     </table>
                 </div>
             </div>
-            <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleSave} title={t.confirmSaveStc} t={t}><p>{t.confirmSaveStcMsg.replace('{day}', selectedDay)}</p></ConfirmationModal>
-        </div>
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={executeSaveChanges}
+                title={t.confirmSaveStc}
+                t={t}
+            >
+                <p>{t.confirmSaveStcMsg.replace('{day}', weekDays[activeDay])}</p>
+            </ConfirmationModal>
+        </>
     );
-};
