@@ -109,7 +109,7 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
                                 <th className="px-4 py-3">{t.hour}</th>
-                                <th className="px-4 py-3">{t.traffic}</th>
+                                <th className="px-4 py-3">{t.footTraffic}</th>
                                 <th className="px-4 py-3">{t.transactions}</th>
                                 <th className="px-4 py-3">{t.employees}</th>
                                 <th className="px-4 py-3">{t.conversion}</th>
@@ -147,3 +147,4 @@ export const STC = ({ selectedStore, currentWeek, currentYear, API_BASE_URL, set
     );
 
 };
+
