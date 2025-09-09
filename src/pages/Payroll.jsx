@@ -6,11 +6,7 @@ import { Download } from 'lucide-react';
 import Papa from 'papaparse';
 
 export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL, setNotification, t }) => {
-    const [payrollData, setPayrollData] = useState([]);
-    const [transfersInData, setTransfersInData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [saveState, setSaveState] = useState('idle');
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [performanceGoals, setPerformanceGoals] = useState({});
     const [sales, setSales] = useState([]);
     const [schedule, setSchedule] = useState({ rows: [] });
@@ -71,8 +67,6 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
             };
         });
 
-        // transfers in logic can be added here if needed
-
         return employeeData;
 
     }, [allEmployees, selectedStore, schedule, sales]);
@@ -92,11 +86,6 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
         
         return { payrollPercentage: percentage, targetVsActual: difference, payrollPercentageColor: colorClass };
     }, [processedPayrollData, sales, performanceGoals]);
-
-    const handleConfirmSave = () => {
-        console.log("Saving payroll data...");
-        setIsConfirmModalOpen(false);
-    };
 
     const handleDownload = () => {
          const dataToExport = processedPayrollData.map(emp => ({
@@ -121,7 +110,6 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
         link.click();
         document.body.removeChild(link);
     };
-
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
@@ -154,7 +142,6 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
                 </div>
                 <div className="flex gap-4">
                     <button onClick={handleDownload} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2" /> {t.download}</button>
-                    <SaveButton onClick={() => setIsConfirmModalOpen(true)} saveState={saveState} text={t.savePayroll} />
                 </div>
             </div>
             <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
@@ -178,15 +165,6 @@ export const Payroll = ({ allEmployees, selectedStore, currentWeek, currentYear,
                     </table>
                 </div>
             </div>
-             <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                onClose={() => setIsConfirmModalOpen(false)}
-                onConfirm={handleConfirmSave}
-                title={t.confirmSavePayroll}
-                t={t}
-            >
-                <p>{t.confirmSavePayrollMsg}</p>
-            </ConfirmationModal>
         </div>
     );
 };

@@ -1,37 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
 import { RefreshCw } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
-import { TRANSACTION_TYPES, SALE_CATEGORIES, COLORS } from '../constants';
+import { TRANSACTION_TYPES, SALE_CATEGORIES, DAYS_OF_WEEK } from '../constants';
 
-const ReportStatCard = ({ title, value }) => (
-    <div className="bg-gray-700/50 p-4 rounded-lg text-center">
-        <p className="text-sm text-gray-400">{title}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
-    </div>
-);
-
-const TrendChart = ({ data, dataKey, title, color, formatter }) => (
-    <div>
-        <h3 className="text-lg font-semibold text-gray-200 mb-2">{title}</h3>
-        <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={data} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#4A5568" />
-                <XAxis dataKey="name" stroke="#A0AEC0" />
-                <YAxis stroke="#A0AEC0" tickFormatter={formatter} domain={['dataMin', 'dataMax']} />
-                <Tooltip
-                    contentStyle={{ backgroundColor: '#2D3748', border: '1px solid #4A5568', color: '#E2E8F0' }}
-                    itemStyle={{ color: '#E2E8F0' }}
-                    formatter={formatter}
-                />
-                <Legend />
-                <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} activeDot={{ r: 8 }} />
-            </LineChart>
-        </ResponsiveContainer>
-    </div>
-);
-
-export const Reports = ({ t, allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL }) => {
+export const Reports = ({ t, selectedStore, currentWeek, currentYear, API_BASE_URL }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [sales, setSales] = useState([]);
     const [schedule, setSchedule] = useState({ rows: [] });
@@ -61,8 +33,7 @@ export const Reports = ({ t, allEmployees, selectedStore, currentWeek, currentYe
 
     const reportData = useMemo(() => {
         const dailyData = {};
-        for(let i = 0; i < 7; i++) {
-            const dayName = new Date(2000, 0, i+2).toLocaleDateString('en-US', { weekday: 'long' });
+        for(const dayName of DAYS_OF_WEEK) {
             dailyData[dayName] = {
                 sales: 0,
                 transactions: 0,
@@ -100,7 +71,6 @@ export const Reports = ({ t, allEmployees, selectedStore, currentWeek, currentYe
 
     const dailyAnalysis = useMemo(() => {
         const dailyGoals = JSON.parse(goals.DailyGoals || '{}');
-        const kpiGoals = JSON.parse(goals.KpiTargets || '{}');
 
         return Object.entries(reportData).map(([day, data]) => {
             const dayKey = day.toLowerCase();
