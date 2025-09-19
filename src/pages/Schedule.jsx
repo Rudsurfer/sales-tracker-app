@@ -347,8 +347,14 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 @media print {
                     body * { visibility: hidden; }
                     #printable-schedule, #printable-schedule * { visibility: visible; }
-                    #printable-schedule { position: absolute; left: 0; top: 0; width: 100%; }
-                    .no-print { display: none; }
+                    #printable-schedule { 
+                        position: absolute; 
+                        left: 0; 
+                        top: 0; 
+                        width: 100%;
+                    }
+                    .no-print, .print-hide { display: none !important; }
+                    .print-only { display: block !important; visibility: visible !important; }
                 }
             `}</style>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
@@ -368,7 +374,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
                 </div>
                 <div id="printable-schedule" className="overflow-x-auto">
-                    <h2 className="text-xl font-bold mb-4 print-only">{t.schedule} - {t.store} {selectedStore} - {t.currentWeek} {currentWeek}, {currentYear}</h2>
+                    <h2 className="text-xl font-bold mb-4 hidden print-only">{t.schedule} - {t.store} {selectedStore} - {t.week} {currentWeek}, {currentYear}</h2>
                     <table className="w-full text-sm text-left text-gray-400">
                         <thead className="text-xs text-gray-300 uppercase bg-gray-700">
                             <tr>
@@ -377,7 +383,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                 <th scope="col" className="px-4 py-3 align-top print-hide">{t.jobTitleDescription}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
                                 {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalSchedHrs}</th>
+                                <th scope="col" className="px-4 py-3 align-top">{t.totalSchedHrs}</th>
                                 <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalActualHrs}</th>
                                 <th scope="col" className="px-4 py-3 align-top no-print">{t.actions}</th>
                             </tr>
@@ -411,7 +417,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                 <div className="flex flex-col space-y-1">
                                                     <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
                                                     <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
-                                                    <div className="relative">
+                                                    <div className="relative print-hide">
                                                         {isEditing ? (
                                                             <input 
                                                                 type="number" 
@@ -419,13 +425,13 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                                 onBlur={() => setEditingCell(null)}
                                                                 onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
                                                                 autoFocus
-                                                                className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} 
+                                                                className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center`} 
                                                                 step="0.25" 
                                                             />
                                                         ) : (
                                                             <div 
                                                                 onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
-                                                                className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
+                                                                className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
                                                             >
                                                                 {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
                                                             </div>
@@ -435,7 +441,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                 </div>
                                             </td>
                                         )})}
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalScheduledHours)}</td>
+                                        <td className="px-4 py-2 text-center font-bold">{decimalHoursToHM(totalScheduledHours)}</td>
                                         <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
                                         <td className="px-4 py-2 text-center no-print">
                                             <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
@@ -499,4 +505,3 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
-
