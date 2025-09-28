@@ -5,7 +5,6 @@ import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
-// Helper function to convert decimal hours to HHh MMm format
 const decimalHoursToHM = (decimalHours) => {
     if (!decimalHours || decimalHours <= 0) return "0h 0m";
     const totalMinutes = Math.round(decimalHours * 60);
@@ -141,6 +140,30 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [timeAdjustmentData, setTimeAdjustmentData] = useState(null);
     const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
+
+    const printStyles = `
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-schedule, #printable-schedule * {
+                visibility: visible;
+            }
+            #printable-schedule {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print, .print-hide {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+                visibility: visible !important;
+            }
+        }
+    `;
 
     const fetchSchedule = async () => {
         setIsLoading(true);
@@ -334,8 +357,6 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     
     const handleManagerPasscodeSuccess = () => {
         setIsManagerPasscodeOpen(false);
-        // Now open the time adjustment modal
-        // This assumes timeAdjustmentData is already set with the row and day info
     };
 
     if (isLoading || !schedule) {
@@ -344,119 +365,113 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
 
     return (
         <>
-            <style>{`
-                @media print {
-                    body * { visibility: hidden; }
-                    #printable-schedule, #printable-schedule * { visibility: visible; }
-                    #printable-schedule { position: absolute; left: 0; top: 0; width: 100%; }
-                    .no-print { display: none; }
-                }
-            `}</style>
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div className="flex justify-end mb-4 gap-4 no-print">
-                    <button onClick={() => window.print()} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                        <Printer size={18} className="mr-2"/> {t.printSchedule}
-                    </button>
-                    {schedule.isLocked ? (
-                        <span className="flex items-center bg-gray-700 text-green-400 font-bold py-2 px-4 rounded-lg">
-                            <Lock size={18} className="mr-2"/> {t.weekLocked}
-                        </span>
-                    ) : (
-                        <button onClick={handleFinalizeWeek} className="flex items-center bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
-                            <Unlock size={18} className="mr-2"/> {t.finalizeWeek}
+            <style>{printStyles}</style>
+            <div id="printable-schedule">
+                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <div className="flex justify-end mb-4 gap-4 no-print">
+                        <button onClick={() => window.print()} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <Printer size={18} className="mr-2"/> {t.printSchedule}
                         </button>
-                    )}
-                    <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
-                </div>
-                <div id="printable-schedule" className="overflow-x-auto">
-                    <h2 className="text-xl font-bold mb-4 print-only">{t.schedule} - {t.store} {selectedStore} - {t.currentWeek} {currentWeek}, {currentYear}</h2>
-                    <table className="w-full text-sm text-left text-gray-400">
-                        <thead className="text-xs text-gray-300 uppercase bg-gray-700">
-                            <tr>
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.employeeId}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.jobTitleDescription}</th>
-                                <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
-                                {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalSchedHrs}</th>
-                                <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalActualHrs}</th>
-                                <th scope="col" className="px-4 py-3 align-top no-print">{t.actions}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {schedule.rows.map(row => {
-                                const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-                                const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-                                return (
-                                    <tr key={row.EmployeeID}>
-                                        <td className="px-4 py-2 print-hide"><input type="text" placeholder="ID" value={row.PositionID || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                        <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.Name || ''} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                        <td className="px-4 py-2 print-hide">
-                                            <select value={row.JobTitle} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1">
-                                                {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
-                                            </select>
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <div className="flex items-center space-x-2">
-                                                <input type="number" placeholder={t.objective} value={row.objective || 0} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" />
-                                                <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300 no-print"><Target size={18}/></button>
-                                            </div>
-                                        </td>
-                                        {DAYS_OF_WEEK.map((day, dayIndex) => {
-                                            const dayKey = day.toLowerCase();
-                                            const shiftValue = row.shifts?.[dayKey] || '';
-                                            const isVacation = shiftValue.toLowerCase().startsWith('vac');
-                                            const isEditing = editingCell === `${row.EmployeeID}-${dayKey}`;
-                                            return (
-                                            <td key={day} className="px-2 py-2">
-                                                <div className="flex flex-col space-y-1">
-                                                    <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
-                                                    <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
-                                                    <div className="relative">
-                                                        {isEditing ? (
-                                                            <input 
-                                                                type="number" 
-                                                                value={row.actualHours?.[dayKey] || ''} 
-                                                                onBlur={() => setEditingCell(null)}
-                                                                onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
-                                                                autoFocus
-                                                                className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} 
-                                                                step="0.25" 
-                                                            />
-                                                        ) : (
-                                                            <div 
-                                                                onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
-                                                                className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
-                                                            >
-                                                                {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
-                                                            </div>
-                                                        )}
-                                                        {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
-                                                    </div>
+                        {schedule.isLocked ? (
+                            <span className="flex items-center bg-gray-700 text-green-400 font-bold py-2 px-4 rounded-lg">
+                                <Lock size={18} className="mr-2"/> {t.weekLocked}
+                            </span>
+                        ) : (
+                            <button onClick={handleFinalizeWeek} className="flex items-center bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
+                                <Unlock size={18} className="mr-2"/> {t.finalizeWeek}
+                            </button>
+                        )}
+                        <SaveButton onClick={() => executeSaveSchedule()} saveState={saveState} text={t.saveSchedule} />
+                    </div>
+                    <div className="overflow-x-auto">
+                         <h2 className="text-xl font-bold mb-4 hidden print-only">{t.schedule} - {t.store} {selectedStore} - {t.week} {currentWeek}, {currentYear}</h2>
+                        <table className="w-full text-sm text-left text-gray-400">
+                            <thead className="text-xs text-gray-300 uppercase bg-gray-700">
+                                <tr>
+                                    <th scope="col" className="px-4 py-3 align-top print-hide">{t.employeeId}</th>
+                                    <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
+                                    <th scope="col" className="px-4 py-3 align-top print-hide">{t.jobTitleDescription}</th>
+                                    <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
+                                    {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
+                                    <th scope="col" className="px-4 py-3 align-top">{t.totalSchedHrs}</th>
+                                    <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalActualHrs}</th>
+                                    <th scope="col" className="px-4 py-3 align-top no-print">{t.actions}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {schedule.rows.map(row => {
+                                    const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
+                                    const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+                                    return (
+                                        <tr key={row.EmployeeID}>
+                                            <td className="px-4 py-2 print-hide"><input type="text" placeholder="ID" value={row.PositionID || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
+                                            <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.Name || ''} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
+                                            <td className="px-4 py-2 print-hide">
+                                                <select value={row.JobTitle} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1">
+                                                    {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="flex items-center space-x-2">
+                                                    <input type="number" placeholder={t.objective} value={row.objective || 0} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" />
+                                                    <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300 no-print"><Target size={18}/></button>
                                                 </div>
                                             </td>
-                                        )})}
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalScheduledHours)}</td>
-                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
-                                        <td className="px-4 py-2 text-center no-print">
-                                            <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                    <div className="mt-4 flex gap-4 no-print">
-                        <button onClick={handleAddRow}
-                                className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <PlusCircle size={20} className="mr-2" />
-                            {t.addToSchedule}
-                        </button>
-                        <button onClick={() => setIsGuestModalOpen(true)}
-                                className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <UserPlus size={20} className="mr-2" />
-                            {t.addGuestEmployee}
-                        </button>
+                                            {DAYS_OF_WEEK.map((day, dayIndex) => {
+                                                const dayKey = day.toLowerCase();
+                                                const shiftValue = row.shifts?.[dayKey] || '';
+                                                const isVacation = shiftValue.toLowerCase().startsWith('vac');
+                                                const isEditing = editingCell === `${row.EmployeeID}-${dayKey}`;
+                                                return (
+                                                <td key={day} className="px-2 py-2">
+                                                    <div className="flex flex-col space-y-1">
+                                                        <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
+                                                        <div className="relative print-hide">
+                                                            {isEditing ? (
+                                                                <input 
+                                                                    type="number" 
+                                                                    value={row.actualHours?.[dayKey] || ''} 
+                                                                    onBlur={() => setEditingCell(null)}
+                                                                    onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
+                                                                    autoFocus
+                                                                    className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center`} 
+                                                                    step="0.25" 
+                                                                />
+                                                            ) : (
+                                                                <div 
+                                                                    onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
+                                                                    className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
+                                                                >
+                                                                    {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
+                                                                </div>
+                                                            )}
+                                                            {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            )})}
+                                            <td className="px-4 py-2 text-center font-bold">{decimalHoursToHM(totalScheduledHours)}</td>
+                                            <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
+                                            <td className="px-4 py-2 text-center no-print">
+                                                <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                        <div className="mt-4 flex gap-4 no-print">
+                            <button onClick={handleAddRow}
+                                    className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                                <PlusCircle size={20} className="mr-2" />
+                                {t.addToSchedule}
+                            </button>
+                            <button onClick={() => setIsGuestModalOpen(true)}
+                                    className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                                <UserPlus size={20} className="mr-2" />
+                                {t.addGuestEmployee}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
