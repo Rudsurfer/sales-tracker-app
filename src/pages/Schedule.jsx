@@ -5,8 +5,11 @@ import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
+// Base64 representation of the Rudsak logo
+const rudsakLogoBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+oAAAPqAQMAAADo6M4hAAAABlBMVEUAAAABAQCj92LdAAABKUlEQVR42u3PMQEAAAgEILV/53mTC1s9RUKDQEJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJC"
+
 const decimalHoursToHM = (decimalHours) => {
-    if (!decimalHours || decimalHours <= 0) return "0h 0m";
+    if (!decimal-hours || decimalHours <= 0) return "0h 0m";
     const totalMinutes = Math.round(decimalHours * 60);
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
@@ -335,22 +338,17 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         setIsManagerPasscodeOpen(false);
     };
 
-    const handleDownloadPdf = async () => {
+    const handleDownloadPdf = () => {
         const { jsPDF } = window.jspdf;
-        const scheduleEl = document.getElementById('schedule-table');
-        if (!scheduleEl) return;
-    
-        const printContainer = document.createElement('div');
-        printContainer.style.position = 'absolute';
-        printContainer.style.left = '-9999px';
-        printContainer.style.top = '-9999px';
-        printContainer.style.backgroundColor = 'white';
-        printContainer.style.padding = '20px';
-        printContainer.style.fontFamily = 'sans-serif';
-        printContainer.style.color = 'black';
-        printContainer.style.width = '1056px'; // Letter size landscape width in pixels at 96 DPI
-    
-        const logoUrl = '[https://cdn.shopify.com/s/files/1/0081/4425/8929/files/rudsak-logo-retina.png](https://cdn.shopify.com/s/files/1/0081/4425/8929/files/rudsak-logo-retina.png)';
+        
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.top = '0';
+        tempContainer.style.backgroundColor = 'white';
+        tempContainer.style.padding = '2rem';
+        tempContainer.style.width = '1056px';
+
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
         const endOfWeek = new Date(startOfWeek);
@@ -358,19 +356,31 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const options = { month: 'short', day: 'numeric' };
         const locale = language === 'fr' ? 'fr-CA' : 'en-US';
         const dateRange = `${startOfWeek.toLocaleDateString(locale, options)} - ${endOfWeek.toLocaleDateString(locale, options)}`;
-
+        
         let totalScheduledHoursWeek = 0;
+        schedule.rows.forEach(row => {
+            totalScheduledHoursWeek += Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
+        });
 
-        let tableHtml = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <img src="${logoUrl}" style="height: 40px;" />
+        const headerHtml = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-family: sans-serif; color: black;">
+                <img src="${rudsakLogoBase64}" style="height: 40px;" />
                 <div style="text-align: right;">
                     <h2 style="font-size: 24px; margin: 0;">${t.schedule}</h2>
                     <p style="margin: 0;">${t.store} ${selectedStore} | ${t.week} ${currentWeek} (${dateRange}, ${currentYear})</p>
                 </div>
             </div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                <thead style="background-color: #f2f2f2;">
+        `;
+        
+        const footerHtml = `
+             <div style="text-align: right; margin-top: 20px; font-size: 14px; font-weight: bold; font-family: sans-serif; color: black;">
+                <p>${t.totalStoreHours}: ${decimalHoursToHM(totalScheduledHoursWeek)}</p>
+            </div>
+        `;
+        
+        const tableHtml = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: sans-serif; color: black;">
+                <thead style="background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; color-adjust: exact;">
                     <tr>
                         <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">${t.employeeName}</th>
                         ${weekDays.map(day => `<th style="padding: 8px; border: 1px solid #ccc; text-align: center;">${day}</th>`).join('')}
@@ -378,55 +388,49 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     </tr>
                 </thead>
                 <tbody>
-        `;
-        
-        schedule.rows.forEach(row => {
-            const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-            totalScheduledHoursWeek += totalScheduledHours;
-            tableHtml += `
-                <tr style="border-bottom: 1px solid #ccc;">
-                    <td style="padding: 8px; border: 1px solid #ccc;">${row.Name}</td>
-                    ${DAYS_OF_WEEK.map(day => {
-                        const dayKey = day.toLowerCase();
-                        const shiftValue = row.shifts?.[dayKey] || 'OFF';
-                        return `<td style="padding: 8px; border: 1px solid #ccc; text-align: center;">${shiftValue}</td>`
+                    ${schedule.rows.map(row => {
+                        const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
+                        return `
+                            <tr style="border-bottom: 1px solid #ccc;">
+                                <td style="padding: 8px; border: 1px solid #ccc;">${row.Name}</td>
+                                ${DAYS_OF_WEEK.map(day => {
+                                    const dayKey = day.toLowerCase();
+                                    const shiftValue = row.shifts?.[dayKey] || 'OFF';
+                                    return `<td style="padding: 8px; border: 1px solid #ccc; text-align: center;">${shiftValue}</td>`
+                                }).join('')}
+                                <td style="padding: 8px; border: 1px solid #ccc; text-align: center; font-weight: bold;">${decimalHoursToHM(totalScheduledHours)}</td>
+                            </tr>
+                        `;
                     }).join('')}
-                    <td style="padding: 8px; border: 1px solid #ccc; text-align: center; font-weight: bold;">${decimalHoursToHM(totalScheduledHours)}</td>
-                </tr>
-            `;
-        });
-        
-        tableHtml += `
                 </tbody>
             </table>
-            <div style="text-align: right; margin-top: 20px; font-size: 14px; font-weight: bold;">
-                <p>${t.totalStoreHours}: ${decimalHoursToHM(totalScheduledHoursWeek)}</p>
-            </div>
         `;
-    
-        printContainer.innerHTML = tableHtml;
-        document.body.appendChild(printContainer);
-    
-        html2canvas(printContainer, { scale: 2 }).then(canvas => {
+
+        tempContainer.innerHTML = headerHtml + tableHtml + footerHtml;
+        document.body.appendChild(tempContainer);
+
+        html2canvas(tempContainer, { scale: 2 }).then(canvas => {
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'in',
-                format: 'letter'
-            });
-            
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
-            const canvasWidth = canvas.width;
-            const canvasHeight = canvas.height;
-            const ratio = Math.min(pdfWidth / (canvasWidth/96), pdfHeight / (canvasHeight/96));
-            
-            pdf.addImage(imgData, 'PNG', 0, 0, canvasWidth * ratio / 2, canvasHeight * ratio / 2);
+            const canvasAspectRatio = canvas.width / canvas.height;
+            const pdfAspectRatio = pdfWidth / pdfHeight;
+            let finalWidth, finalHeight;
+
+            if (canvasAspectRatio > pdfAspectRatio) {
+                finalWidth = pdfWidth;
+                finalHeight = pdfWidth / canvasAspectRatio;
+            } else {
+                finalHeight = pdfHeight;
+                finalWidth = pdfHeight * canvasAspectRatio;
+            }
+
+            pdf.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
             pdf.save(`Schedule-Store-${selectedStore}-Week${currentWeek}.pdf`);
-            document.body.removeChild(printContainer);
+            document.body.removeChild(tempContainer);
         });
     };
-
 
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
@@ -457,6 +461,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                 <th scope="col" className="px-4 py-3 align-top">{t.employeeId}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.jobTitleDescription}</th>
+                                <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
                                 {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
                                 <th scope="col" className="px-4 py-3 align-top">{t.totalSchedHrs}</th>
                                 <th scope="col" className="px-4 py-3 align-top">{t.totalActualHrs}</th>
@@ -475,6 +480,12 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                             <select value={row.JobTitle} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1">
                                                 {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
                                             </select>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <div className="flex items-center space-x-2">
+                                                <input type="number" placeholder={t.objective} value={row.objective || 0} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" />
+                                                <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300 no-print"><Target size={18}/></button>
+                                            </div>
                                         </td>
                                         {DAYS_OF_WEEK.map((day, dayIndex) => {
                                             const dayKey = day.toLowerCase();
