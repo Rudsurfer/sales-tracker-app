@@ -37,7 +37,7 @@ export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_
     y += 30;
     doc.setFontSize(10);
 
-    if (!schedule || !schedule.details) {
+    if (!schedule || !schedule.details || schedule.details.length === 0) {
       doc.text("No schedule data available.", margin, y);
     } else {
       // Table header
@@ -52,7 +52,6 @@ export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_
         const employee = allEmployees.find(e => e.EmployeeID === row.EmployeeID);
         const name = employee ? employee.Name : "Unknown";
 
-        // Page break
         if (y > pageHeight - margin) {
           doc.addPage();
           y = margin;
@@ -77,7 +76,7 @@ export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Schedule</h2>
-      {schedule ? (
+      {schedule && schedule.details && schedule.details.length > 0 ? (
         <div>
           <button
             onClick={handleDownloadPdf}
@@ -110,7 +109,7 @@ export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_
           </div>
         </div>
       ) : (
-        <p>Loading schedule...</p>
+        <p>No schedule data available.</p>
       )}
     </div>
   );
