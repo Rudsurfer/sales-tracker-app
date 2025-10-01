@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { rudsakLogoBase64 } from "../assets/rudsakLogoBase64";
 
 export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_URL, allEmployees }) => {
   const [schedule, setSchedule] = useState(null);
@@ -25,53 +24,36 @@ export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_
 
   const handleDownloadPdf = async () => {
     const { jsPDF } = window.jspdf;
-
     const doc = new jsPDF("p", "pt", "a4");
-    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 40;
     const lineHeight = 20;
-
     let y = margin;
 
-    // Add logo
-    const imgProps = {
-      x: margin,
-      y: y,
-      width: 100,
-      height: 40,
-    };
-    doc.addImage(rudsakLogoBase64, "PNG", imgProps.x, imgProps.y, imgProps.width, imgProps.height);
-
-    y += imgProps.height + 20;
-
-    // Title
+    // --- Title ---
     doc.setFontSize(14);
-    doc.text(
-      `Schedule - Store ${selectedStore} | Week ${currentWeek}, ${currentYear}`,
-      margin,
-      y
-    );
-
+    doc.text(`Schedule - Store ${selectedStore} | Week ${currentWeek}, ${currentYear}`, margin, y);
     y += 30;
     doc.setFontSize(10);
 
     if (!schedule || !schedule.details) {
       doc.text("No schedule data available.", margin, y);
     } else {
-      // Table Header
+      // Table header
       doc.setFont(undefined, "bold");
       doc.text("Employee", margin, y);
       doc.text("Shifts", margin + 200, y);
       doc.text("Hours", margin + 400, y);
       doc.setFont(undefined, "normal");
-
       y += lineHeight;
 
-      schedule.details.forEach((row, index) => {
+      schedule.details.forEach((row) => {
         const employee = allEmployees.find(e => e.EmployeeID === row.EmployeeID);
         const name = employee ? employee.Name : "Unknown";
 
-        if (y > doc.internal.pageSize.getHeight() - margin) {
+        // Page break
+        if (y > pageHeight - margin) {
           doc.addPage();
           y = margin;
         }
@@ -84,14 +66,10 @@ export const Schedule = ({ t, selectedStore, currentWeek, currentYear, API_BASE_
       });
     }
 
-    // Footer
-    y = doc.internal.pageSize.getHeight() - margin;
+    // --- Footer ---
+    y = pageHeight - margin;
     doc.setFontSize(10);
-    doc.text(
-      `Generated on ${new Date().toLocaleString()}`,
-      margin,
-      y
-    );
+    doc.text(`Generated on ${new Date().toLocaleString()}`, margin, y);
 
     doc.save(`schedule_${selectedStore}_week${currentWeek}_${currentYear}.pdf`);
   };
