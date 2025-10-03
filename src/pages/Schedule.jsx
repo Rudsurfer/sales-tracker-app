@@ -14,9 +14,9 @@ const decimalHoursToHM = (decimalHours) => {
 };
 
 // --- Your Original Sub-Components (Modals, etc.) ---
-const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => { /* ... your modal code ... */ };
-const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentScheduleRows, t }) => { /* ... your modal code ... */ };
-const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => { /* ... your modal code ... */ };
+const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => { /* ... */ };
+const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentScheduleRows, t }) => { /* ... */ };
+const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => { /* ... */ };
 
 export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
     const [schedule, setSchedule] = useState(null);
@@ -31,18 +31,14 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
-    // --- MODIFIED: PDF Generation Function ---
     const handleDownloadPdf = () => {
         if (!schedule || !schedule.rows) {
             alert("Schedule data is not available to generate a PDF.");
             return;
         }
-
         const doc = new window.jspdf.jsPDF('landscape');
-        
         doc.setFontSize(14);
         doc.text(`Schedule Store ${selectedStore} - Current Week ${currentWeek}, ${currentYear}`, 40, 30);
-
         const head = [['Employee Name', ...weekDays, 'Total Scheduled Hours']];
         const body = schedule.rows.map(row => {
             let totalScheduledHours = 0;
@@ -50,28 +46,96 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 const dayKey = day.toLowerCase();
                 const shift = row.shifts?.[dayKey] || 'OFF';
                 totalScheduledHours += parseShift(shift);
-                // This line is changed to only return the shift
                 return shift;
             });
             const totalHoursFormatted = decimalHoursToHM(totalScheduledHours);
             return [row.Name, ...dailyCells, totalHoursFormatted];
         });
-
         doc.autoTable({
-            head: head,
-            body: body,
-            startY: 40,
-            theme: 'grid',
+            head: head, body: body, startY: 40, theme: 'grid',
             headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
-            styles: { fontSize: 8, cellPadding: 2 },
-            alternateRowStyles: { fillColor: [245, 245, 245] },
+            styles: { fontSize: 8, cellPadding: 2 }, alternateRowStyles: { fillColor: [245, 245, 245] },
         });
-
         doc.save(`Schedule_Store-${selectedStore}_W${currentWeek}_${currentYear}.pdf`);
     };
+    
+    // --- TEMPORARY DEBUG FUNCTION ---
+    const fetchSchedule = async () => {
+        setIsLoading(true);
+        try {
+            console.log("Step 1: Fetching data from API...");
+            const [scheduleRes, timeLogsRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
+                fetch(`${API_BASE_URL}/timelog/${selectedStore}/${currentWeek}/${currentYear}`)
+            ]);
+            console.log("Step 2: API responses received.");
+    
+            let scheduleData;
+            if (scheduleRes.ok) {
+                scheduleData = await scheduleRes.json();
+                 if (scheduleData.status === 'not_found') {
+                    const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+                    const newScheduleRows = storeEmployees.map(emp => ({
+                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                    }));
+                    scheduleData = { rows: newScheduleRows, isLocked: false };
+                }
+            } else {
+                const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+                const newScheduleRows = storeEmployees.map(emp => ({
+                    EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                    objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                }));
+                scheduleData = { rows: newScheduleRows, isLocked: false };
+            }
+            console.log("Step 3: Schedule data processed.");
+            
+            if (!timeLogsRes.ok) throw new Error(`Timelog fetch failed: ${timeLogsRes.status}`);
+            
+            const timeLogs = await timeLogsRes.json();
+            console.log("Step 4: Time log data processed.");
+    
+            scheduleData.rows.forEach(row => {
+                const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID);
+                const dailyHours = {};
+                employeeLogs.forEach(log => {
+                    if (log.ClockIn && log.ClockOut) {
+                        const clockInDate = new Date(log.ClockIn);
+                        const clockOutDate = new Date(log.ClockOut);
+                        const day = DAYS_OF_WEEK[clockInDate.getDay()].toLowerCase();
+                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
+                        if (duration > 5) {
+                            duration -= 0.5;
+                        }
+                        dailyHours[day] = (dailyHours[day] || 0) + duration;
+                    }
+                });
+                row.actualHours = dailyHours;
+            });
+            console.log("Step 5: Data merging complete.");
+    
+            const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+            const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
+            storeEmployees.forEach(emp => {
+                if (!scheduleEmployeeIds.has(emp.EmployeeID)) {
+                    scheduleData.rows.push({
+                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                    });
+                }
+            });
+    
+            setSchedule(scheduleData);
+            console.log("Step 6: Schedule state has been set successfully!");
+    
+        } catch (error) {
+            console.error("--- FETCH FAILED --- The error occurred at the step before this message:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-    // --- Your original working functions (fetchSchedule, handlers, etc.) ---
-    const fetchSchedule = async () => { /* ... your working fetch logic ... */ };
     useEffect(() => { fetchSchedule(); }, [selectedStore, currentWeek, currentYear, allEmployees]);
     const handleRowChange = (id, field, value, day) => { /* ... */ };
     const handleAddRow = () => { /* ... */ };
@@ -91,54 +155,11 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         <>
             <div>
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <div className="flex justify-end mb-4 gap-4 no-print">{/* ... your buttons ... */}</div>
+                    <div className="flex justify-end mb-4 gap-4 no-print">{/* ... your buttons, including Download PDF ... */}</div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-400">
-                            <thead className="text-xs text-gray-300 uppercase bg-gray-700">
-                                <tr>
-                                    <th scope="col" className="px-4 py-3 align-top print-hide">{t.employeeId}</th>
-                                    <th scope="col" className="px-4 py-3 align-top">{t.employeeName}</th>
-                                    <th scope="col" className="px-4 py-3 align-top print-hide">{t.jobTitleDescription}</th>
-                                    <th scope="col" className="px-4 py-3 align-top">{t.salesObjective}</th>
-                                    {weekDays.map(day => <th key={day} scope="col" className="px-2 py-3 text-center">{day}</th>)}
-                                    {/* --- RESTORED: On-Screen Scheduled Hours Column Header --- */}
-                                    <th scope="col" className="px-4 py-3 align-top">{t.totalSchedHrs}</th>
-                                    <th scope="col" className="px-4 py-3 align-top print-hide">{t.totalActualHrs}</th>
-                                    <th scope="col" className="px-4 py-3 align-top no-print">{t.actions}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {schedule.rows.map(row => {
-                                    try {
-                                        const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-                                        const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-                                        return (
-                                            <tr key={row.EmployeeID}>
-                                                {/* ... your other <td> elements ... */}
-                                                
-                                                {/* This maps over the days of the week */}
-                                                {DAYS_OF_WEEK.map((day, dayIndex) => { /* ... */ })}
-
-                                                {/* --- RESTORED: On-Screen Scheduled Hours Column Data --- */}
-                                                <td className="px-4 py-2 text-center font-bold">{decimalHoursToHM(totalScheduledHours)}</td>
-                                                <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
-                                                <td className="px-4 py-2 text-center no-print">
-                                                    <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
-                                                </td>
-                                            </tr>
-                                        )
-                                    } catch (error) {
-                                        console.error(`Error rendering row for employee: ${row?.Name || row?.EmployeeID}`, error);
-                                        return (
-                                            <tr key={row.EmployeeID} className="bg-red-900/50">
-                                                <td colSpan="12" className="px-4 py-2 text-center text-white">
-                                                    Error loading this row. See console for details.
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
-                                })}
-                            </tbody>
+                            <thead className="text-xs text-gray-300 uppercase bg-gray-700">{/* ... your table header ... */}</thead>
+                            <tbody>{/* ... your table body with try/catch ... */}</tbody>
                         </table>
                         <div className="mt-4 flex gap-4 no-print">{/* ... your "add row" buttons ... */}</div>
                     </div>
