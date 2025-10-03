@@ -19,6 +19,16 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
 const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => { /* ... */ };
 
 export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
+    export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
+    // --- ADD THESE THREE LINES ---
+    console.log('--- DATA CHECK ---');
+    console.log('Selected Store ID:', selectedStore);
+    console.log('All Employees Prop:', allEmployees);
+    // -----------------------------
+
+    const [schedule, setSchedule] = useState(null);
+    // ... rest of the component     
+    
     const [schedule, setSchedule] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     // ... other state variables ...
@@ -169,3 +179,4 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
