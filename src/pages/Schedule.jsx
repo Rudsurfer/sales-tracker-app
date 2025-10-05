@@ -31,7 +31,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
 
     const dailyTotals = useMemo(() => { /* ... */ });
 
-    // --- YOUR PDF GENERATION FUNCTION ---
+    // --- PDF GENERATION ---
     const handleDownloadPdf = () => {
         if (!schedule || !schedule.rows) {
             alert("Schedule data is not available to generate a PDF.");
@@ -69,78 +69,21 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         doc.save(`Schedule_Store-${selectedStore}_W${currentWeek}_${currentYear}.pdf`);
     };
     
-    // --- ROBUST FETCH FUNCTION ---
-    const fetchSchedule = async () => {
-        setIsLoading(true);
-        try {
-            const [scheduleRes, timeLogsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
-                fetch(`${API_BASE_URL}/timelog/${selectedStore}/${currentWeek}/${currentYear}`)
-            ]);
-            if (!scheduleRes.ok || !timeLogsRes.ok) {
-                console.error("Failed to fetch schedule or timelogs", { scheduleRes, timeLogsRes });
-                const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
-                const newScheduleRows = storeEmployees.map(emp => ({ EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle, objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} }));
-                setSchedule({ rows: newScheduleRows, isLocked: false });
-                return; 
-            }
-            let scheduleData = await scheduleRes.json();
-            const timeLogs = await timeLogsRes.json();
-            if (scheduleData.status === 'not_found') {
-                const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
-                const newScheduleRows = storeEmployees.map(emp => ({ EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle, objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} }));
-                scheduleData = { rows: newScheduleRows, isLocked: false };
-            }
-            scheduleData.rows.forEach(row => {
-                const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID);
-                const dailyHours = {};
-                employeeLogs.forEach(log => {
-                    if (log.ClockIn && log.ClockOut) {
-                        const clockInDate = new Date(log.ClockIn);
-                        const clockOutDate = new Date(log.ClockOut);
-                        const day = DAYS_OF_WEEK[clockInDate.getDay()].toLowerCase();
-                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
-                        if (duration > 5) { duration -= 0.5; }
-                        dailyHours[day] = (dailyHours[day] || 0) + duration;
-                    }
-                });
-                row.actualHours = dailyHours;
-            });
-            const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
-            const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
-            storeEmployees.forEach(emp => {
-                if (!scheduleEmployeeIds.has(emp.EmployeeID)) {
-                    scheduleData.rows.push({ EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle, objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} });
-                }
-            });
-            setSchedule(scheduleData);
-        } catch (error) {
-            console.error("A critical error occurred while fetching schedule:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // --- FETCH FUNCTION ---
+    const fetchSchedule = async () => { /* ... same as yours ... */ };
 
     useEffect(() => { fetchSchedule(); }, [selectedStore, currentWeek, currentYear, allEmployees]);
     
-    const handleRowChange = (id, field, value, day) => {
-        const newRows = schedule.rows.map(row => {
-            if (row.EmployeeID === id) {
-                if (day) {
-                    const newFieldData = { ...row[field], [day]: value };
-                    return { ...row, [field]: newFieldData };
-                }
-                return { ...row, [field]: value };
-            }
-            return row;
-        });
-        setSchedule(prev => ({ ...prev, rows: newRows }));
-    };
+    const handleRowChange = (id, field, value, day) => { /* ... */ };
 
-    // ... other handler functions ...
+    // ... other handlers ...
 
     if (isLoading || !schedule) {
-        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+        );
     }
 
     return (
@@ -162,52 +105,15 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                     const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
                                     return (
                                         <tr key={row.EmployeeID}>
-                                            <td className="px-4 py-2 print-hide"><input type="text" placeholder="ID" value={row.PositionID || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                            <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.Name || ''} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                            <td className="px-4 py-2 print-hide">
-                                                <select value={row.JobTitle} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1">
-                                                    {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
-                                                </select>
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <div className="flex items-center space-x-2">
-                                                    <input type="number" placeholder={t.objective} value={row.objective || 0} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" />
-                                                    <button onClick={() => setEditingObjectivesFor(row)} className="text-blue-400 hover:text-blue-300 no-print"><Target size={18}/></button>
-                                                </div>
-                                            </td>
-                                            {DAYS_OF_WEEK.map((day, dayIndex) => {
-                                                const dayKey = day.toLowerCase();
-                                                const shiftValue = row.shifts?.[dayKey] || '';
-                                                const isVacation = shiftValue.toLowerCase().startsWith('vac');
-                                                const isEditing = editingCell === `${row.EmployeeID}-${dayKey}`;
-                                                return (
-                                                <td key={day} className="px-2 py-2">
-                                                    <div className="flex flex-col space-y-1">
-                                                        <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
-                                                        <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
-                                                        <div className="relative">
-                                                            {isEditing ? (
-                                                                <input type="number" value={row.actualHours?.[dayKey] || ''} onBlur={() => setEditingCell(null)} onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} autoFocus className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} step="0.25" />
-                                                            ) : (
-                                                                <div onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)} className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}>{decimalHoursToHM(row.actualHours?.[dayKey] || 0)}</div>
-                                                            )}
-                                                            {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            )})}
-                                            <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalScheduledHours)}</td>
-                                            <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
-                                            <td className="px-4 py-2 text-center no-print">
-                                                <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
-                                            </td>
+                                            {/* ... row cells ... */}
                                         </tr>
-                                    )
+                                    );
                                 })}
                             </tbody>
                             <tfoot className="bg-gray-700 text-white font-bold">{/* ... tfoot with totals ... */}</tfoot>
                         </table>
-                        {/* --- THIS IS THE SECTION YOU PROVIDED --- */}
+
+                        {/* 🔄 replaced block starts here */}
                         <div className="mt-4 flex gap-4 no-print">
                             <button onClick={handleAddRow}
                                     className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
@@ -222,45 +128,53 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                         </div>
                     </div>
                 </div>
-                {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
-                <AddGuestAssociateModal 
-                    isOpen={isGuestModalOpen}
-                    onClose={() => setIsGuestModalOpen(false)}
-                    onAdd={handleAddGuest}
-                    allEmployees={allEmployees}
-                    currentScheduleRows={schedule.rows}
+            </div>
+
+            {editingObjectivesFor && (
+                <DailyObjectiveModal
+                    t={t}
+                    language={language}
+                    row={editingObjectivesFor}
+                    onRowChange={handleRowChange}
+                    onClose={() => setEditingObjectivesFor(null)}
+                />
+            )}
+            <AddGuestAssociateModal 
+                isOpen={isGuestModalOpen}
+                onClose={() => setIsGuestModalOpen(false)}
+                onAdd={handleAddGuest}
+                allEmployees={allEmployees}
+                currentScheduleRows={schedule.rows}
+                t={t}
+            />
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={handleConfirmFinalize}
+                title={t.finalizeWeek}
+                t={t}
+            >
+                <p>{t.confirmLockWeek}</p>
+            </ConfirmationModal>
+            {isManagerPasscodeOpen && (
+                <PasscodeModal 
+                    onSuccess={handleManagerPasscodeSuccess} 
+                    onClose={() => setIsManagerPasscodeOpen(false)} 
+                    t={t} 
+                    API_BASE_URL={API_BASE_URL}
+                    isManagerCheck={true}
+                />
+            )}
+            {timeAdjustmentData && (
+                <TimeAdjustmentModal 
+                    isOpen={!!timeAdjustmentData}
+                    onClose={() => setTimeAdjustmentData(null)}
+                    onSave={handleTimeAdjustmentSave}
+                    employeeName={timeAdjustmentData.row.Name}
+                    day={timeAdjustmentData.day}
                     t={t}
                 />
-                <ConfirmationModal
-                    isOpen={isConfirmModalOpen}
-                    onClose={() => setIsConfirmModalOpen(false)}
-                    onConfirm={handleConfirmFinalize}
-                    title={t.finalizeWeek}
-                    t={t}
-                >
-                    <p>{t.confirmLockWeek}</p>
-                </ConfirmationModal>
-                {isManagerPasscodeOpen && (
-                    <PasscodeModal 
-                        onSuccess={handleManagerPasscodeSuccess} 
-                        onClose={() => setIsManagerPasscodeOpen(false)} 
-                        t={t} 
-                        API_BASE_URL={API_BASE_URL}
-                        isManagerCheck={true}
-                    />
-                )}
-                {timeAdjustmentData && (
-                    <TimeAdjustmentModal 
-                        isOpen={!!timeAdjustmentData}
-                        onClose={() => setTimeAdjustmentData(null)}
-                        onSave={handleTimeAdjustmentSave}
-                        employeeName={timeAdjustmentData.row.Name}
-                        day={timeAdjustmentData.day}
-                        t={t}
-                    />
-                )}
-            </div>
+            )}
         </>
     );
 };
-
