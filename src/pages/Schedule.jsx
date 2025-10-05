@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, auseState, useEffect, useMemo, useRef } from 'react';
 import { PlusCircle, Trash2, Target, X, UserPlus, Download, Lock, Unlock, Edit2 } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import { PasscodeModal } from '../components/PasscodeModal';
@@ -156,7 +156,6 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-400">
                             <thead>{/* ... thead ... */}</thead>
-                            {/* --- YOUR PREFERRED TBODY --- */}
                             <tbody>
                                 {schedule.rows.map(row => {
                                     const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
@@ -208,58 +207,59 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                             </tbody>
                             <tfoot className="bg-gray-700 text-white font-bold">{/* ... tfoot with totals ... */}</tfoot>
                         </table>
+                        {/* --- THIS IS THE SECTION YOU PROVIDED --- */}
                         <div className="mt-4 flex gap-4 no-print">
                             <button onClick={handleAddRow}
-                                className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <PlusCircle size={20} className="mr-2" />
-                            {t.addToSchedule}
-                        </button>
-                        <button onClick={() => setIsGuestModalOpen(true)}
-                                className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                            <UserPlus size={20} className="mr-2" />
-                            {t.addGuestEmployee}
-                        </button>
+                                    className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                                <PlusCircle size={20} className="mr-2" />
+                                {t.addToSchedule}
+                            </button>
+                            <button onClick={() => setIsGuestModalOpen(true)}
+                                    className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                                <UserPlus size={20} className="mr-2" />
+                                {t.addGuestEmployee}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
-            <AddGuestAssociateModal 
-                isOpen={isGuestModalOpen}
-                onClose={() => setIsGuestModalOpen(false)}
-                onAdd={handleAddGuest}
-                allEmployees={allEmployees}
-                currentScheduleRows={schedule.rows}
-                t={t}
-            />
-            <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                onClose={() => setIsConfirmModalOpen(false)}
-                onConfirm={handleConfirmFinalize}
-                title={t.finalizeWeek}
-                t={t}
-            >
-                <p>{t.confirmLockWeek}</p>
-            </ConfirmationModal>
-            {isManagerPasscodeOpen && (
-                <PasscodeModal 
-                    onSuccess={handleManagerPasscodeSuccess} 
-                    onClose={() => setIsManagerPasscodeOpen(false)} 
-                    t={t} 
-                    API_BASE_URL={API_BASE_URL}
-                    isManagerCheck={true}
-                />
-            )}
-            {timeAdjustmentData && (
-                <TimeAdjustmentModal 
-                    isOpen={!!timeAdjustmentData}
-                    onClose={() => setTimeAdjustmentData(null)}
-                    onSave={handleTimeAdjustmentSave}
-                    employeeName={timeAdjustmentData.row.Name}
-                    day={timeAdjustmentData.day}
+                {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
+                <AddGuestAssociateModal 
+                    isOpen={isGuestModalOpen}
+                    onClose={() => setIsGuestModalOpen(false)}
+                    onAdd={handleAddGuest}
+                    allEmployees={allEmployees}
+                    currentScheduleRows={schedule.rows}
                     t={t}
                 />
-            )}
+                <ConfirmationModal
+                    isOpen={isConfirmModalOpen}
+                    onClose={() => setIsConfirmModalOpen(false)}
+                    onConfirm={handleConfirmFinalize}
+                    title={t.finalizeWeek}
+                    t={t}
+                >
+                    <p>{t.confirmLockWeek}</p>
+                </ConfirmationModal>
+                {isManagerPasscodeOpen && (
+                    <PasscodeModal 
+                        onSuccess={handleManagerPasscodeSuccess} 
+                        onClose={() => setIsManagerPasscodeOpen(false)} 
+                        t={t} 
+                        API_BASE_URL={API_BASE_URL}
+                        isManagerCheck={true}
+                    />
+                )}
+                {timeAdjustmentData && (
+                    <TimeAdjustmentModal 
+                        isOpen={!!timeAdjustmentData}
+                        onClose={() => setTimeAdjustmentData(null)}
+                        onSave={handleTimeAdjustmentSave}
+                        employeeName={timeAdjustmentData.row.Name}
+                        day={timeAdjustmentData.day}
+                        t={t}
+                    />
+                )}
+            </div>
         </>
     );
 };
-                
