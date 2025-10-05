@@ -29,24 +29,47 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
-    const dailyTotals = useMemo(() => {
-        const totals = { sunday: 0, monday: 0, tuesday: 0, wednesday: 0, thursday: 0, friday: 0, saturday: 0, weekly: 0 };
-        if (!schedule?.rows) return totals;
-        schedule.rows.forEach(row => {
-            let employeeWeeklyTotal = 0;
-            DAYS_OF_WEEK.forEach(day => {
+    const dailyTotals = useMemo(() => { /* ... */ });
+
+    // --- YOUR PDF GENERATION FUNCTION ---
+    const handleDownloadPdf = () => {
+        if (!schedule || !schedule.rows) {
+            alert("Schedule data is not available to generate a PDF.");
+            return;
+        }
+
+        const doc = new window.jspdf.jsPDF('landscape');
+        
+        doc.setFontSize(14);
+        doc.text(`Schedule Store ${selectedStore} - Current Week ${currentWeek}, ${currentYear}`, 40, 30);
+
+        const head = [['Employee Name', ...weekDays, 'Total Scheduled Hours']];
+        const body = schedule.rows.map(row => {
+            let totalScheduledHours = 0;
+            const dailyCells = DAYS_OF_WEEK.map(day => {
                 const dayKey = day.toLowerCase();
-                const shiftHours = parseShift(row.shifts?.[dayKey] || '');
-                totals[dayKey] += shiftHours;
-                employeeWeeklyTotal += shiftHours;
+                const shift = row.shifts?.[dayKey] || 'OFF';
+                totalScheduledHours += parseShift(shift);
+                return shift;
             });
-            totals.weekly += employeeWeeklyTotal;
+            const totalHoursFormatted = decimalHoursToHM(totalScheduledHours);
+            return [row.Name, ...dailyCells, totalHoursFormatted];
         });
-        return totals;
-    }, [schedule]);
 
-    const handleDownloadPdf = () => { /* ... PDF function ... */ };
+        doc.autoTable({
+            head: head,
+            body: body,
+            startY: 40,
+            theme: 'grid',
+            headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+            styles: { fontSize: 8, cellPadding: 2 },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+        });
 
+        doc.save(`Schedule_Store-${selectedStore}_W${currentWeek}_${currentYear}.pdf`);
+    };
+    
+    // --- ROBUST FETCH FUNCTION ---
     const fetchSchedule = async () => {
         setIsLoading(true);
         try {
@@ -114,14 +137,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         setSchedule(prev => ({ ...prev, rows: newRows }));
     };
 
-    const handleAddRow = () => { /* ... */ };
-    const handleAddGuest = (employee) => { /* ... */ };
-    const handleRemoveRow = (id) => { /* ... */ };
-    const executeSaveSchedule = async (lockWeek = false) => { /* ... */ };
-    const handleFinalizeWeek = () => setIsConfirmModalOpen(true);
-    const handleConfirmFinalize = () => { /* ... */ };
-    const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => { /* ... */ };
-    const handleManagerPasscodeSuccess = () => { /* ... */ };
+    // ... other handler functions ...
 
     if (isLoading || !schedule) {
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
@@ -131,11 +147,16 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         <>
             <div>
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <div className="flex justify-end mb-4 gap-4 no-print">{/* ... buttons ... */}</div>
+                    <div className="flex justify-end mb-4 gap-4 no-print">
+                        <button onClick={handleDownloadPdf} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <Download size={18} className="mr-2"/> Download PDF
+                        </button>
+                        {/* ... other buttons ... */}
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-400">
                             <thead>{/* ... thead ... */}</thead>
-                            {/* --- THIS IS YOUR PROVIDED TBODY --- */}
+                            {/* --- YOUR PREFERRED TBODY --- */}
                             <tbody>
                                 {schedule.rows.map(row => {
                                     const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
@@ -167,22 +188,9 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                         <input type="number" placeholder={t.sched} value={parseShift(shiftValue).toFixed(2)} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-center print-hide" />
                                                         <div className="relative">
                                                             {isEditing ? (
-                                                                <input 
-                                                                    type="number" 
-                                                                    value={row.actualHours?.[dayKey] || ''} 
-                                                                    onBlur={() => setEditingCell(null)}
-                                                                    onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
-                                                                    autoFocus
-                                                                    className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} 
-                                                                    step="0.25" 
-                                                                />
+                                                                <input type="number" value={row.actualHours?.[dayKey] || ''} onBlur={() => setEditingCell(null)} onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} autoFocus className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center print-hide`} step="0.25" />
                                                             ) : (
-                                                                <div 
-                                                                    onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
-                                                                    className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
-                                                                >
-                                                                    {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
-                                                                </div>
+                                                                <div onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)} className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center print-hide ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}>{decimalHoursToHM(row.actualHours?.[dayKey] || 0)}</div>
                                                             )}
                                                             {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
                                                         </div>
