@@ -208,11 +208,58 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                             </tbody>
                             <tfoot className="bg-gray-700 text-white font-bold">{/* ... tfoot with totals ... */}</tfoot>
                         </table>
-                        <div className="mt-4 flex gap-4 no-print">{/* ... add buttons ... */}</div>
+                        <div className="mt-4 flex gap-4 no-print">
+                            <button onClick={handleAddRow}
+                                className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            <PlusCircle size={20} className="mr-2" />
+                            {t.addToSchedule}
+                        </button>
+                        <button onClick={() => setIsGuestModalOpen(true)}
+                                className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            <UserPlus size={20} className="mr-2" />
+                            {t.addGuestEmployee}
+                        </button>
                     </div>
                 </div>
             </div>
-            {/* ... modals ... */}
+            {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
+            <AddGuestAssociateModal 
+                isOpen={isGuestModalOpen}
+                onClose={() => setIsGuestModalOpen(false)}
+                onAdd={handleAddGuest}
+                allEmployees={allEmployees}
+                currentScheduleRows={schedule.rows}
+                t={t}
+            />
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={handleConfirmFinalize}
+                title={t.finalizeWeek}
+                t={t}
+            >
+                <p>{t.confirmLockWeek}</p>
+            </ConfirmationModal>
+            {isManagerPasscodeOpen && (
+                <PasscodeModal 
+                    onSuccess={handleManagerPasscodeSuccess} 
+                    onClose={() => setIsManagerPasscodeOpen(false)} 
+                    t={t} 
+                    API_BASE_URL={API_BASE_URL}
+                    isManagerCheck={true}
+                />
+            )}
+            {timeAdjustmentData && (
+                <TimeAdjustmentModal 
+                    isOpen={!!timeAdjustmentData}
+                    onClose={() => setTimeAdjustmentData(null)}
+                    onSave={handleTimeAdjustmentSave}
+                    employeeName={timeAdjustmentData.row.Name}
+                    day={timeAdjustmentData.day}
+                    t={t}
+                />
+            )}
         </>
     );
 };
+                
