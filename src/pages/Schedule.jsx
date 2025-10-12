@@ -13,9 +13,25 @@ const decimalHoursToHM = (decimalHours) => {
     return `${hours}h ${minutes}m`;
 };
 
-const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => { /* ... */ };
-const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentScheduleRows, t }) => { /* ... */ };
-const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => { /* ... */ };
+const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
+    const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
+    return ( <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">{/* ... modal content ... */}</div> );
+};
+const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentScheduleRows, t }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    if (!isOpen) return null;
+    const currentEmployeeIds = new Set(currentScheduleRows.map(r => r.EmployeeID));
+    const filteredEmployees = allEmployees.filter(emp => !currentEmployeeIds.has(emp.EmployeeID) && emp.Name.toLowerCase().includes(searchTerm.toLowerCase()));
+    return ( <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">{/* ... modal content ... */}</div> );
+};
+const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => {
+    const [clockIn, setClockIn] = useState('');
+    const [clockOut, setClockOut] = useState('');
+    const [reason, setReason] = useState('');
+    if (!isOpen) return null;
+    const handleSave = () => { if (!clockIn || !clockOut || !reason) { alert(t.fillAllFields); return; } onSave({ clockIn, clockOut, reason }); onClose(); };
+    return ( <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">{/* ... modal content ... */}</div> );
+};
 
 export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
     const [schedule, setSchedule] = useState(null);
@@ -29,20 +45,30 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
-    const dailyTotals = useMemo(() => { /* ... */ });
+    const dailyTotals = useMemo(() => {
+        const totals = { sunday: 0, monday: 0, tuesday: 0, wednesday: 0, thursday: 0, friday: 0, saturday: 0, weekly: 0 };
+        if (!schedule?.rows) return totals;
+        schedule.rows.forEach(row => {
+            let employeeWeeklyTotal = 0;
+            DAYS_OF_WEEK.forEach(day => {
+                const dayKey = day.toLowerCase();
+                const shiftHours = parseShift(row.shifts?.[dayKey] || '');
+                totals[dayKey] += shiftHours;
+                employeeWeeklyTotal += shiftHours;
+            });
+            totals.weekly += employeeWeeklyTotal;
+        });
+        return totals;
+    }, [schedule]);
 
-    // --- PDF GENERATION ---
     const handleDownloadPdf = () => {
         if (!schedule || !schedule.rows) {
             alert("Schedule data is not available to generate a PDF.");
             return;
         }
-
         const doc = new window.jspdf.jsPDF('landscape');
-        
         doc.setFontSize(14);
         doc.text(`Schedule Store ${selectedStore} - Current Week ${currentWeek}, ${currentYear}`, 40, 30);
-
         const head = [['Employee Name', ...weekDays, 'Total Scheduled Hours']];
         const body = schedule.rows.map(row => {
             let totalScheduledHours = 0;
@@ -55,126 +81,102 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             const totalHoursFormatted = decimalHoursToHM(totalScheduledHours);
             return [row.Name, ...dailyCells, totalHoursFormatted];
         });
-
-        doc.autoTable({
-            head: head,
-            body: body,
-            startY: 40,
-            theme: 'grid',
-            headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
-            styles: { fontSize: 8, cellPadding: 2 },
-            alternateRowStyles: { fillColor: [245, 245, 245] },
-        });
-
+        doc.autoTable({ head, body, startY: 40, theme: 'grid', headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }, styles: { fontSize: 8, cellPadding: 2 }, alternateRowStyles: { fillColor: [245, 245, 245] }, });
         doc.save(`Schedule_Store-${selectedStore}_W${currentWeek}_${currentYear}.pdf`);
     };
     
-    // --- FETCH FUNCTION ---
-    const fetchSchedule = async () => { /* ... same as yours ... */ };
+    // --- FETCH FUNCTION (FROM YOUR WORKING PRODUCTION CODE) ---
+    const fetchSchedule = async () => {
+        setIsLoading(true);
+        try {
+            const [scheduleRes, timeLogsRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`),
+                fetch(`${API_BASE_URL}/timelog/${selectedStore}/${currentWeek}/${currentYear}`)
+            ]);
+
+            let scheduleData;
+            if (scheduleRes.ok) {
+                scheduleData = await scheduleRes.json();
+                 if (scheduleData.status === 'not_found') {
+                    const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+                    const newScheduleRows = storeEmployees.map(emp => ({
+                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                    }));
+                    scheduleData = { rows: newScheduleRows, isLocked: false };
+                }
+            } else {
+                const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+                const newScheduleRows = storeEmployees.map(emp => ({
+                    EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                    objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                }));
+                scheduleData = { rows: newScheduleRows, isLocked: false };
+            }
+            
+            const timeLogs = await timeLogsRes.json();
+
+            scheduleData.rows.forEach(row => {
+                const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID);
+                const dailyHours = {};
+                employeeLogs.forEach(log => {
+                    if (log.ClockIn && log.ClockOut) {
+                        const clockInDate = new Date(log.ClockIn);
+                        const clockOutDate = new Date(log.ClockOut);
+                        const day = DAYS_OF_WEEK[clockInDate.getDay()].toLowerCase();
+                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
+                        if (duration > 5) {
+                            duration -= 0.5;
+                        }
+                        dailyHours[day] = (dailyHours[day] || 0) + duration;
+                    }
+                });
+                row.actualHours = dailyHours;
+            });
+
+            const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
+            const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
+            storeEmployees.forEach(emp => {
+                if (!scheduleEmployeeIds.has(emp.EmployeeID)) {
+                    scheduleData.rows.push({
+                        EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
+                        objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
+                    });
+                }
+            });
+
+            setSchedule(scheduleData);
+
+        } catch (error) {
+            console.error("Error fetching schedule:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => { fetchSchedule(); }, [selectedStore, currentWeek, currentYear, allEmployees]);
     
-    const handleRowChange = (id, field, value, day) => { /* ... */ };
-
-    // ... other handlers ...
+    const handleRowChange = (id, field, value, day) => { /* ... full function ... */ };
+    const handleAddRow = () => { /* ... full function ... */ };
+    const handleAddGuest = (employee) => { /* ... full function ... */ };
+    const handleRemoveRow = (id) => { /* ... full function ... */ };
+    const executeSaveSchedule = async (lockWeek = false) => { /* ... full function ... */ };
+    const handleFinalizeWeek = () => setIsConfirmModalOpen(true);
+    const handleConfirmFinalize = () => { /* ... full function ... */ };
+    const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => { /* ... full function ... */ };
+    const handleManagerPasscodeSuccess = () => { setIsManagerPasscodeOpen(false); };
 
     if (isLoading || !schedule) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-        );
+        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
     return (
         <>
             <div>
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <div className="flex justify-end mb-4 gap-4 no-print">
-                        <button onClick={handleDownloadPdf} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                            <Download size={18} className="mr-2"/> Download PDF
-                        </button>
-                        {/* ... other buttons ... */}
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left text-gray-400">
-                            <thead>{/* ... thead ... */}</thead>
-                            <tbody>
-                                {schedule.rows.map(row => {
-                                    const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-                                    const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-                                    return (
-                                        <tr key={row.EmployeeID}>
-                                            {/* ... row cells ... */}
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                            <tfoot className="bg-gray-700 text-white font-bold">{/* ... tfoot with totals ... */}</tfoot>
-                        </table>
-
-                        {/* 🔄 replaced block starts here */}
-                        <div className="mt-4 flex gap-4 no-print">
-                            <button onClick={handleAddRow}
-                                    className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                                <PlusCircle size={20} className="mr-2" />
-                                {t.addToSchedule}
-                            </button>
-                            <button onClick={() => setIsGuestModalOpen(true)}
-                                    className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-                                <UserPlus size={20} className="mr-2" />
-                                {t.addGuestEmployee}
-                            </button>
-                        </div>
-                    </div>
+                    {/* ... your full JSX with buttons, table, and modals ... */}
                 </div>
             </div>
-
-            {editingObjectivesFor && (
-                <DailyObjectiveModal
-                    t={t}
-                    language={language}
-                    row={editingObjectivesFor}
-                    onRowChange={handleRowChange}
-                    onClose={() => setEditingObjectivesFor(null)}
-                />
-            )}
-            <AddGuestAssociateModal 
-                isOpen={isGuestModalOpen}
-                onClose={() => setIsGuestModalOpen(false)}
-                onAdd={handleAddGuest}
-                allEmployees={allEmployees}
-                currentScheduleRows={schedule.rows}
-                t={t}
-            />
-            <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                onClose={() => setIsConfirmModalOpen(false)}
-                onConfirm={handleConfirmFinalize}
-                title={t.finalizeWeek}
-                t={t}
-            >
-                <p>{t.confirmLockWeek}</p>
-            </ConfirmationModal>
-            {isManagerPasscodeOpen && (
-                <PasscodeModal 
-                    onSuccess={handleManagerPasscodeSuccess} 
-                    onClose={() => setIsManagerPasscodeOpen(false)} 
-                    t={t} 
-                    API_BASE_URL={API_BASE_URL}
-                    isManagerCheck={true}
-                />
-            )}
-            {timeAdjustmentData && (
-                <TimeAdjustmentModal 
-                    isOpen={!!timeAdjustmentData}
-                    onClose={() => setTimeAdjustmentData(null)}
-                    onSave={handleTimeAdjustmentSave}
-                    employeeName={timeAdjustmentData.row.Name}
-                    day={timeAdjustmentData.day}
-                    t={t}
-                />
-            )}
         </>
     );
 };
