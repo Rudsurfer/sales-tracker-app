@@ -489,11 +489,21 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                             const shiftValue = row.shifts?.[dayKey] || '';
                                             const isVacation = shiftValue.toLowerCase().startsWith('vac');
                                             const isEditing = editingCell === `${row.EmployeeID}-${dayKey}`;
+                                            const calculatedHours = parseShift(shiftValue);
                                             return (
-                                            <td key={day} className="px-2 py-2">
-                                                <div className="flex flex-col space-y-1">
-                                                    <input type="text" placeholder={t.shift} value={shiftValue} onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} />
-                                                    <div className="relative">
+                                            <td key={day} className="px-2 py-2 align-top">
+                                                <div className="flex flex-col items-center space-y-1">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder={t.shift} 
+                                                        value={shiftValue} 
+                                                        onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} 
+                                                        className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} 
+                                                    />
+                                                    <div className="w-24 text-center text-xs text-gray-500 h-4">
+                                                        {calculatedHours > 0 ? `(${calculatedHours.toFixed(2)})` : ''}
+                                                    </div>
+                                                    <div className="relative print-hide">
                                                         {isEditing ? (
                                                             <input 
                                                                 type="number" 
@@ -518,7 +528,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                             </td>
                                         )})}
                                         <td className="px-4 py-2 text-center font-bold">{decimalHoursToHM(totalScheduledHours)}</td>
-                                        <td className="px-4 py-2 text-center font-bold">{decimalHoursToHM(totalActualHours)}</td>
+                                        <td className="px-4 py-2 text-center font-bold print-hide">{decimalHoursToHM(totalActualHours)}</td>
                                         <td className="px-4 py-2 text-center no-print">
                                             <button onClick={() => handleRemoveRow(row.EmployeeID)} className="text-red-500 hover:text-red-400"><Trash2 size={18} /></button>
                                         </td>
