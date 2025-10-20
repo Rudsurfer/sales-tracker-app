@@ -500,10 +500,16 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                         onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} 
                                                         className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} 
                                                     />
-                                                    <div className="w-24 text-center text-xs text-gray-500 h-4 flex items-center justify-center bg-gray-800 border border-gray-700 rounded-md">
-                                                        {calculatedHours > 0 ? `(${calculatedHours.toFixed(2)})` : ''}
+                                                    <div className="relative w-24"> {/* Added relative positioning here */}
+                                                        {calculatedHours > 0 ? (
+                                                            <div className="bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center text-xs text-gray-500 flex items-center justify-center mt-1">
+                                                                {`(${calculatedHours.toFixed(2)})`}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="h-8 mt-1"></div> // Spacer to maintain height
+                                                        )}
                                                     </div>
-                                                    <div className="relative print-hide">
+                                                    <div className="relative print-hide w-24">
                                                         {isEditing ? (
                                                             <input 
                                                                 type="number" 
@@ -511,18 +517,19 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                                 onBlur={() => setEditingCell(null)}
                                                                 onChange={e => handleRowChange(row.EmployeeID, 'actualHours', e.target.value, dayKey)} 
                                                                 autoFocus
-                                                                className={`w-24 bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center`} 
+                                                                className={`w-full bg-gray-900 border border-blue-500 rounded-md px-2 py-1 text-center`} 
                                                                 step="0.25" 
                                                             />
                                                         ) : (
                                                             <div 
                                                                 onDoubleClick={() => !schedule.isLocked && setEditingCell(`${row.EmployeeID}-${dayKey}`)}
-                                                                className={`w-24 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
+                                                                className={`w-full bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center ${schedule.isLocked ? 'bg-gray-700' : 'cursor-pointer hover:bg-gray-800'}`}
                                                             >
                                                                 {decimalHoursToHM(row.actualHours?.[dayKey] || 0)}
+                                                                {!schedule.isLocked && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity no-print"><Edit2 size={12}/></button>}
                                                             </div>
                                                         )}
-                                                        {!schedule.isLocked && !isEditing && <button onClick={() => { setTimeAdjustmentData({row, dayIndex, day: weekDays[dayIndex]}); setIsManagerPasscodeOpen(true); }} className="absolute right-0 top-0 h-full px-1 text-gray-500 hover:text-white no-print"><Edit2 size={12}/></button>}
+                                                        
                                                     </div>
                                                 </div>
                                             </td>
