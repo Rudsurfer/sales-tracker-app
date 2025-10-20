@@ -500,7 +500,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                         onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} 
                                                         className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} 
                                                     />
-                                                    <div className="w-24 text-center text-xs text-gray-500 h-4">
+                                                    <div className="w-24 text-center text-xs text-gray-500 h-4 flex items-center justify-center bg-gray-800 border border-gray-700 rounded-md">
                                                         {calculatedHours > 0 ? `(${calculatedHours.toFixed(2)})` : ''}
                                                     </div>
                                                     <div className="relative print-hide">
