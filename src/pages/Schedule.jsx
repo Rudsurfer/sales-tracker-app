@@ -500,16 +500,10 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                         onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} 
                                                         className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} 
                                                     />
-                                                    <div className="relative w-24"> {/* Added relative positioning here */}
-                                                        {calculatedHours > 0 ? (
-                                                            <div className="bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center text-xs text-gray-500 flex items-center justify-center mt-1">
-                                                                {`(${calculatedHours.toFixed(2)})`}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="h-8 mt-1"></div> // Spacer to maintain height
-                                                        )}
+                                                    <div className="w-24 bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-center text-xs text-gray-400 h-8 flex items-center justify-center">
+                                                        {calculatedHours > 0 ? `(${calculatedHours.toFixed(2)})` : '(0.00)'}
                                                     </div>
-                                                    <div className="relative print-hide w-24">
+                                                    <div className="relative group w-24">
                                                         {isEditing ? (
                                                             <input 
                                                                 type="number" 
