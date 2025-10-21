@@ -337,15 +337,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
 
     const handleDownloadPdf = () => {
         const { jsPDF } = window.jspdf;
-        
-        const tempContainer = document.createElement('div');
-        tempContainer.style.position = 'absolute';
-        tempContainer.style.left = '-9999px';
-        tempContainer.style.top = '0';
-        tempContainer.style.backgroundColor = 'white';
-        tempContainer.style.padding = '2rem';
-        tempContainer.style.width = '1056px';
-
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+    
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
         const endOfWeek = new Date(startOfWeek);
@@ -353,80 +346,91 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const options = { month: 'short', day: 'numeric' };
         const locale = language === 'fr' ? 'fr-CA' : 'en-US';
         const dateRange = `${startOfWeek.toLocaleDateString(locale, options)} - ${endOfWeek.toLocaleDateString(locale, options)}`;
-        
+    
         let totalScheduledHoursWeek = 0;
         schedule.rows.forEach(row => {
             totalScheduledHoursWeek += Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
         });
-
-        const headerHtml = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-family: sans-serif; color: black;">
-                <h1 style="font-size: 28px; font-weight: bold; margin: 0;">Rudsak</h1>
-                <div style="text-align: right;">
-                    <h2 style="font-size: 24px; margin: 0;">${t.schedule}</h2>
-                    <p style="margin: 0;">${t.store} ${selectedStore} | ${t.week} ${currentWeek} (${dateRange}, ${currentYear})</p>
-                </div>
-            </div>
-        `;
-        
-        const footerHtml = `
-             <div style="text-align: right; margin-top: 20px; font-size: 14px; font-weight: bold; font-family: sans-serif; color: black;">
-                <p>${t.totalStoreHours}: ${decimalHoursToHM(totalScheduledHoursWeek)}</p>
-            </div>
-        `;
-        
-        const tableHtml = `
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: sans-serif; color: black;">
-                <thead style="background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; color-adjust: exact;">
-                    <tr>
-                        <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">${t.employeeName}</th>
-                        ${weekDays.map(day => `<th style="padding: 8px; border: 1px solid #ccc; text-align: center;">${day}</th>`).join('')}
-                        <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">${t.totalSchedHrs}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${schedule.rows.map(row => {
-                        const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
-                        return `
-                            <tr style="border-bottom: 1px solid #ccc;">
-                                <td style="padding: 8px; border: 1px solid #ccc;">${row.Name}</td>
-                                ${DAYS_OF_WEEK.map(day => {
-                                    const dayKey = day.toLowerCase();
-                                    const shiftValue = row.shifts?.[dayKey] || 'OFF';
-                                    return `<td style="padding: 8px; border: 1px solid #ccc; text-align: center;">${shiftValue}</td>`
-                                }).join('')}
-                                <td style="padding: 8px; border: 1px solid #ccc; text-align: center; font-weight: bold;">${decimalHoursToHM(totalScheduledHours)}</td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-        `;
-
-        tempContainer.innerHTML = headerHtml + tableHtml + footerHtml;
-        document.body.appendChild(tempContainer);
-
-        html2canvas(tempContainer, { scale: 2 }).then(canvas => {
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const canvasAspectRatio = canvas.width / canvas.height;
-            const pdfAspectRatio = pdfWidth / pdfHeight;
-            let finalWidth, finalHeight;
-
-            if (canvasAspectRatio > pdfAspectRatio) {
-                finalWidth = pdfWidth;
-                finalHeight = pdfWidth / canvasAspectRatio;
-            } else {
-                finalHeight = pdfHeight;
-                finalWidth = pdfHeight * canvasAspectRatio;
-            }
-
-            pdf.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
-            pdf.save(`Schedule-Store-${selectedStore}-Week${currentWeek}.pdf`);
-            document.body.removeChild(tempContainer);
+    
+        const head = [[
+            { content: t.employeeName, styles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' } },
+            ...weekDays.map(day => ({ content: day, styles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'center' } })),
+            { content: t.totalSchedHrs, styles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'center' } }
+        ]];
+    
+        const body = schedule.rows.map(row => {
+            const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
+            return [
+                row.Name,
+                ...DAYS_OF_WEEK.map(day => row.shifts?.[day.toLowerCase()] || 'OFF'),
+                { content: decimalHoursToHM(totalScheduledHours), styles: { fontStyle: 'bold', halign: 'center' } }
+            ];
         });
+    
+        const pageContent = data => {
+            // Header
+            doc.setFontSize(20);
+            doc.setTextColor(40);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Rudsak', data.settings.margin.left, 40);
+    
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'normal');
+            const headerText = `${t.schedule} - ${t.store} ${selectedStore}`;
+            const headerTextWidth = doc.getStringUnitWidth(headerText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+            doc.text(headerText, doc.internal.pageSize.getWidth() - data.settings.margin.right - headerTextWidth, 40);
+            
+            doc.setFontSize(10);
+            const subHeaderText = `${t.week} ${currentWeek} (${dateRange}, ${currentYear})`;
+            const subHeaderTextWidth = doc.getStringUnitWidth(subHeaderText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+            doc.text(subHeaderText, doc.internal.pageSize.getWidth() - data.settings.margin.right - subHeaderTextWidth, 55);
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            doc.setFontSize(10);
+            doc.text(String(data.pageNumber), data.settings.margin.left, doc.internal.pageSize.getHeight() - 20);
+        };
+    
+        doc.autoTable({
+            head: head,
+            body: body,
+            startY: 70,
+            theme: 'grid',
+            didDrawPage: pageContent,
+            styles: {
+                cellPadding: 4,
+                fontSize: 9,
+            },
+            headStyles: {
+                textColor: [33, 33, 33],
+                fillColor: [240, 240, 240],
+                fontStyle: 'bold'
+            },
+            alternateRowStyles: {
+                fillColor: [250, 250, 250]
+            },
+            columnStyles: {
+                0: { cellWidth: 120 },
+                1: { halign: 'center' },
+                2: { halign: 'center' },
+                3: { halign: 'center' },
+                4: { halign: 'center' },
+                5: { halign: 'center' },
+                6: { halign: 'center' },
+                7: { halign: 'center' },
+                8: { cellWidth: 60, halign: 'center' },
+            }
+        });
+        
+        const finalY = doc.autoTable.previous.finalY;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        const footerText = `${t.totalStoreHours}: ${decimalHoursToHM(totalScheduledHoursWeek)}`;
+        const footerTextWidth = doc.getStringUnitWidth(footerText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+        doc.text(footerText, doc.internal.pageSize.getWidth() - doc.internal.pageSize.getWidth() / 8, finalY + 30);
+
+
+        doc.save(`Schedule-Store-${selectedStore}-Week${currentWeek}.pdf`);
     };
 
     if (isLoading || !schedule) {
@@ -500,7 +504,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                                         onChange={(e) => handleRowChange(row.EmployeeID, 'shifts', e.target.value, dayKey)} 
                                                         className={`w-24 border border-gray-600 rounded-md px-2 py-1 text-center ${isVacation ? 'bg-blue-900/50' : 'bg-gray-900/70'}`} 
                                                     />
-                                                    <div className="w-24 bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-center text-xs text-gray-400 h-8 flex items-center justify-center">
+                                                    <div className="w-24 bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-center text-xs text-gray-400 h-8 flex items-center justify-center">
                                                         {calculatedHours > 0 ? `(${calculatedHours.toFixed(2)})` : '(0.00)'}
                                                     </div>
                                                     <div className="relative group w-24">
