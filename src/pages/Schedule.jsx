@@ -151,14 +151,16 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
 
             let scheduleData;
             if (scheduleRes.ok) {
-                scheduleData = await scheduleRes.json();
-                 if (scheduleData.status === 'not_found') {
+                const data = await scheduleRes.json();
+                 if (data.status === 'not_found' || !data.rows) {
                     const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
                     const newScheduleRows = storeEmployees.map(emp => ({
                         EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
                         objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}
                     }));
                     scheduleData = { rows: newScheduleRows, isLocked: false };
+                } else {
+                    scheduleData = data;
                 }
             } else {
                 const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
@@ -169,7 +171,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 scheduleData = { rows: newScheduleRows, isLocked: false };
             }
             
-            const timeLogs = await timeLogsRes.json();
+            const timeLogs = timeLogsRes.ok ? await timeLogsRes.json() : [];
 
             scheduleData.rows.forEach(row => {
                 const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID);
@@ -178,7 +180,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     if (log.ClockIn && log.ClockOut) {
                         const clockInDate = new Date(log.ClockIn);
                         const clockOutDate = new Date(log.ClockOut);
-                        const day = DAYS_OF_WEEK[clockInDate.getDay()].toLowerCase();
+                        const day = DAYS_OF_WEEK[clockInDate.getUTCDay()].toLowerCase();
                         let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
                         if (duration > 5) {
                             duration -= 0.5;
@@ -204,13 +206,16 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
 
         } catch (error) {
             console.error("Error fetching schedule:", error);
+            setSchedule({rows: [], isLocked: false}); // Set a default state on error
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchSchedule();
+        if(selectedStore && allEmployees.length > 0){
+            fetchSchedule();
+        }
     }, [selectedStore, currentWeek, currentYear, allEmployees]);
     
     const handleRowChange = (id, field, value, day) => {
@@ -262,13 +267,14 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     storeId: selectedStore,
                     week: currentWeek,
                     year: currentYear,
-                    isLocked: lockWeek || schedule.isLocked,
+                    isLocked: lockWeek || (schedule && schedule.isLocked),
                     rows: schedule.rows
                 })
             });
             setSaveState('saved');
             setNotification({ message: t.scheduleSavedSuccess, type: 'success' });
             setTimeout(() => setSaveState('idle'), 2000);
+            if(lockWeek) fetchSchedule();
         } catch (error) {
             console.error("Error saving schedule:", error);
             setNotification({ message: t.errorSavingSchedule, type: 'error' });
@@ -280,8 +286,6 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const handleFinalizeWeek = () => setIsConfirmModalOpen(true);
     const handleConfirmFinalize = () => {
         executeSaveSchedule(true);
-        setSchedule(prev => ({...prev, isLocked: true}));
-        setIsConfirmModalOpen(false);
     };
 
     const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => {
@@ -289,9 +293,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const { row, dayIndex } = timeAdjustmentData;
         
         const weekStartDate = new Date(currentDate);
-        weekStartDate.setDate(currentDate.getDate() - currentDate.getDay());
-        const adjustmentDate = new Date(weekStartDate);
-        adjustmentDate.setDate(weekStartDate.getDate() + dayIndex);
+        const currentDayOfWeek = weekStartDate.getUTCDay();
+        weekStartDate.setUTCDate(weekStartDate.getUTCDate() - currentDayOfWeek + dayIndex);
 
         const parseTime = (timeStr) => {
             const isPm = timeStr.toLowerCase().includes('pm');
@@ -299,15 +302,15 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(Number);
             minutes = minutes || 0;
             if (isPm && hours < 12) hours += 12;
-            if (isAm && hours === 12) hours = 0;
+            if (isAm && hours === 12) hours = 0; // Midnight case
             return { hours, minutes };
         };
 
         const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
         const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
 
-        const clockInDate = new Date(adjustmentDate.getFullYear(), adjustmentDate.getMonth(), adjustmentDate.getDate(), inHours, inMinutes);
-        const clockOutDate = new Date(adjustmentDate.getFullYear(), adjustmentDate.getMonth(), adjustmentDate.getDate(), outHours, outMinutes);
+        const clockInDate = new Date(Date.UTC(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate(), inHours, inMinutes));
+        const clockOutDate = new Date(Date.UTC(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate(), outHours, outMinutes));
 
         try {
             await fetch(`${API_BASE_URL}/timelog/adjust`, {
@@ -320,7 +323,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     clockOut: clockOutDate.toISOString(),
                     week: currentWeek,
                     year: currentYear,
-                    reason: reason,
+                    notes: reason,
                 })
             });
             setNotification({ message: "Time adjustment saved.", type: 'success' });
@@ -333,6 +336,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     
     const handleManagerPasscodeSuccess = () => {
         setIsManagerPasscodeOpen(false);
+        setTimeAdjustmentData(prev => ({...prev, authorized: true }));
     };
 
     const handleDownloadPdf = () => {
@@ -348,21 +352,25 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const dateRange = `${startOfWeek.toLocaleDateString(locale, options)} - ${endOfWeek.toLocaleDateString(locale, options)}`;
     
         let totalScheduledHoursWeek = 0;
-        schedule.rows.forEach(row => {
+        (schedule?.rows || []).forEach(row => {
             totalScheduledHoursWeek += Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
         });
     
         const head = [[
-            { content: t.employeeName, styles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' } },
-            ...weekDays.map(day => ({ content: day, styles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'center' } })),
-            { content: t.totalSchedHrs, styles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'center' } }
+            { content: t.employeeName, styles: { fillColor: [41, 41, 41], textColor: 255, fontStyle: 'bold' } },
+            ...weekDays.map(day => ({ content: day, styles: { fillColor: [41, 41, 41], textColor: 255, fontStyle: 'bold', halign: 'center' } })),
+            { content: t.totalSchedHrs, styles: { fillColor: [41, 41, 41], textColor: 255, fontStyle: 'bold', halign: 'center' } }
         ]];
     
-        const body = schedule.rows.map(row => {
+        const body = (schedule?.rows || []).map(row => {
             const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
             return [
-                row.Name,
-                ...DAYS_OF_WEEK.map(day => row.shifts?.[day.toLowerCase()] || 'OFF'),
+                row.Name || 'N/A',
+                ...DAYS_OF_WEEK.map(day => {
+                    const shift = row.shifts?.[day.toLowerCase()] || 'OFF';
+                    const hours = parseShift(shift);
+                    return hours > 0 ? `${shift}\n(${hours.toFixed(2)})` : shift;
+                }),
                 { content: decimalHoursToHM(totalScheduledHours), styles: { fontStyle: 'bold', halign: 'center' } }
             ];
         });
@@ -370,25 +378,25 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const pageContent = data => {
             // Header
             doc.setFontSize(20);
-            doc.setTextColor(40);
+            doc.setTextColor(0, 0, 0);
             doc.setFont('helvetica', 'bold');
             doc.text('Rudsak', data.settings.margin.left, 40);
     
             doc.setFontSize(14);
             doc.setFont('helvetica', 'normal');
-            const headerText = `${t.schedule} - ${t.store} ${selectedStore}`;
+            const headerText = `${t.schedule || 'Schedule'} - ${t.store || 'Store'} ${selectedStore || 'N/A'}`;
             const headerTextWidth = doc.getStringUnitWidth(headerText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
             doc.text(headerText, doc.internal.pageSize.getWidth() - data.settings.margin.right - headerTextWidth, 40);
             
             doc.setFontSize(10);
-            const subHeaderText = `${t.week} ${currentWeek} (${dateRange}, ${currentYear})`;
+            const subHeaderText = `${t.week || 'Week'} ${currentWeek || 'N/A'} (${dateRange}, ${currentYear || 'N/A'})`;
             const subHeaderTextWidth = doc.getStringUnitWidth(subHeaderText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
             doc.text(subHeaderText, doc.internal.pageSize.getWidth() - data.settings.margin.right - subHeaderTextWidth, 55);
 
             // Footer
-            const pageCount = doc.internal.getNumberOfPages();
             doc.setFontSize(10);
-            doc.text(String(data.pageNumber), data.settings.margin.left, doc.internal.pageSize.getHeight() - 20);
+            const pageNumText = `Page ${data.pageNumber}`;
+            doc.text(pageNumText, data.settings.margin.left, doc.internal.pageSize.getHeight() - 20);
         };
     
         doc.autoTable({
@@ -400,24 +408,19 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             styles: {
                 cellPadding: 4,
                 fontSize: 9,
+                valign: 'middle',
+                cellWidth: 'wrap'
             },
             headStyles: {
-                textColor: [33, 33, 33],
-                fillColor: [240, 240, 240],
+                textColor: [255, 255, 255],
+                fillColor: [41, 41, 41],
                 fontStyle: 'bold'
             },
             alternateRowStyles: {
-                fillColor: [250, 250, 250]
+                fillColor: [245, 245, 245]
             },
             columnStyles: {
                 0: { cellWidth: 120 },
-                1: { halign: 'center' },
-                2: { halign: 'center' },
-                3: { halign: 'center' },
-                4: { halign: 'center' },
-                5: { halign: 'center' },
-                6: { halign: 'center' },
-                7: { halign: 'center' },
                 8: { cellWidth: 60, halign: 'center' },
             }
         });
@@ -425,10 +428,9 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const finalY = doc.autoTable.previous.finalY;
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        const footerText = `${t.totalStoreHours}: ${decimalHoursToHM(totalScheduledHoursWeek)}`;
+        const footerText = `${t.totalStoreHours || 'Total Store Hours'}: ${decimalHoursToHM(totalScheduledHoursWeek)}`;
         const footerTextWidth = doc.getStringUnitWidth(footerText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
-        doc.text(footerText, doc.internal.pageSize.getWidth() - doc.internal.pageSize.getWidth() / 8, finalY + 30);
-
+        doc.text(footerText, doc.internal.pageSize.getWidth() - 40 - footerTextWidth, finalY + 40);
 
         doc.save(`Schedule-Store-${selectedStore}-Week${currentWeek}.pdf`);
     };
@@ -441,7 +443,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         <>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-end mb-4 gap-4 no-print">
-                    <button onClick={handleDownloadPdf} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                     <button onClick={handleDownloadPdf} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
                         <Download size={18} className="mr-2"/> {t.downloadPdf}
                     </button>
                     {schedule.isLocked ? (
