@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Users, LogOut, PlusCircle, Trash2, Upload, Download, RefreshCw, FileText, Search } from 'lucide-react';
 import { ALL_STORES, JOB_TITLES } from '../constants';
