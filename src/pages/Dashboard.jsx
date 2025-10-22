@@ -275,5 +275,20 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
                          ))}
                      </div>
                 </div>
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h3 className="text-lg font-semibold mb
+                      <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-200">{t.topCategories}</h3>
+                    <ul className="space-y-2">
+                        {categorySalesData.map((cat, index) => (
+                            <li key={cat.name} className="flex justify-between text-gray-300">
+                                <span>{cat.name}</span>
+                                <span className="font-semibold">{formatCurrency(cat.value)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
