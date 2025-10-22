@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Users, LogOut, PlusCircle, Trash2, Upload, Download, RefreshCw, FileText } from 'lucide-react';
+import { Users, LogOut, PlusCircle, Trash2, Upload, Download, RefreshCw, FileText, Search } from 'lucide-react';
 import { ALL_STORES, JOB_TITLES } from '../constants';
 import { SaveButton, ConfirmationModal } from '../components/ui';
 import Papa from 'papaparse';
 import { Payroll } from './Payroll';
-import { StoreSelector } from '../components/StoreSelector';
 import { WeekNavigator } from '../components/WeekNavigator';
 import { getWeekNumber } from '../utils/helpers';
 
 export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, allEmployees, refreshEmployees }) => {
-    const [view, setView] = useState('employees'); // 'employees' or 'payroll'
+    const [view, setView] = useState('employees');
     const [employees, setEmployees] = useState(allEmployees);
     const [newEmployee, setNewEmployee] = useState({ Name: '', PositionID: '', JobTitle: JOB_TITLES[0], Rate: 0, BaseSalary: 0, StoreID: ALL_STORES[0] });
     const [saveStatus, setSaveStatus] = useState('idle');
@@ -17,18 +16,18 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
     const [importData, setImportData] = useState(null);
     const fileInputRef = useRef(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    
-    // State for Payroll view
+    const [searchTerm, setSearchTerm] = useState(''); // ✅ NEW: search bar state
+
+    // Payroll states
     const [payrollStore, setPayrollStore] = useState(ALL_STORES[0]);
     const [payrollDate, setPayrollDate] = useState(new Date());
     const payrollWeek = useMemo(() => getWeekNumber(payrollDate), [payrollDate]);
     const payrollYear = useMemo(() => payrollDate.getFullYear(), [payrollDate]);
 
-
     useEffect(() => {
         setEmployees(allEmployees);
     }, [allEmployees]);
-    
+
     const handleNewEmployeeChange = (e) => {
         const { name, value } = e.target;
         setNewEmployee(prev => ({ ...prev, [name]: value }));
@@ -47,7 +46,6 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
                 body: JSON.stringify({ ...newEmployee, Rate: Number(newEmployee.Rate), BaseSalary: Number(newEmployee.BaseSalary) })
             });
             if (!response.ok) throw new Error('Failed to add employee');
-            
             setNewEmployee({ Name: '', PositionID: '', JobTitle: JOB_TITLES[0], Rate: 0, BaseSalary: 0, StoreID: ALL_STORES[0] });
             setNotification({ message: t.employeeAddedSuccess, type: 'success' });
             refreshEmployees();
@@ -68,7 +66,14 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
                 fetch(`${API_BASE_URL}/employees/${emp.EmployeeID}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ PositionID: emp.PositionID, Name: emp.Name, JobTitle: emp.JobTitle, Rate: emp.Rate, BaseSalary: emp.BaseSalary, StoreID: emp.StoreID })
+                    body: JSON.stringify({
+                        PositionID: emp.PositionID,
+                        Name: emp.Name,
+                        JobTitle: emp.JobTitle,
+                        Rate: emp.Rate,
+                        BaseSalary: emp.BaseSalary,
+                        StoreID: emp.StoreID
+                    })
                 })
             );
             await Promise.all(promises);
@@ -84,7 +89,7 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
 
     const handleSaveClick = () => setIsConfirmModalOpen(true);
     const handleConfirmSave = () => { setIsConfirmModalOpen(false); executeSaveChanges(); };
-    
+
     const handleDeleteEmployee = async (id) => {
         try {
             await fetch(`${API_BASE_URL}/employees/${id}`, { method: 'DELETE' });
@@ -107,7 +112,7 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
             });
         }
     };
-    
+
     const handleConfirmImport = async () => {
         if (!importData) return;
         try {
@@ -118,7 +123,7 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
             });
             setNotification({ message: t.importSuccess, type: 'success' });
             refreshEmployees();
-        } catch(error) {
+        } catch (error) {
             setNotification({ message: t.importError, type: 'error' });
         } finally {
             setImportData(null);
@@ -129,14 +134,11 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
     const handleDownloadTemplate = () => {
         const csv = "name,positionId,jobTitle,rate,baseSalary,associatedStore";
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", "employee_template.csv");
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "employee_template.csv";
         link.click();
-        document.body.removeChild(link);
     };
 
     const handleForceSync = async () => {
@@ -152,34 +154,74 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
         }
     };
 
+    // ✅ NEW: Filter employees by search term
+    const filteredEmployees = employees.filter(emp =>
+        emp.Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.PositionID.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <div className="bg-gray-900 text-white min-h-screen p-8 font-sans">
             <header className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-4">
                     <h1 className="text-3xl font-bold flex items-center"><Users className="mr-3" /> {t.admin}</h1>
                     <div className="flex space-x-1 bg-gray-800 p-1 rounded-lg">
-                         <button onClick={() => setView('employees')} className={`px-4 py-2 rounded-md text-sm font-bold ${view === 'employees' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
-                           <Users size={16} className="mr-2 inline-block" />{t.employeeDatabase}
-                         </button>
-                         <button onClick={() => setView('payroll')} className={`px-4 py-2 rounded-md text-sm font-bold ${view === 'payroll' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
-                           <FileText size={16} className="mr-2 inline-block" />{t.payroll}
-                         </button>
+                        <button onClick={() => setView('employees')} className={`px-4 py-2 rounded-md text-sm font-bold ${view === 'employees' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
+                            <Users size={16} className="mr-2 inline-block" />{t.employeeDatabase}
+                        </button>
+                        <button onClick={() => setView('payroll')} className={`px-4 py-2 rounded-md text-sm font-bold ${view === 'payroll' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
+                            <FileText size={16} className="mr-2 inline-block" />{t.payroll}
+                        </button>
                     </div>
                 </div>
                 <button onClick={onExit} className="flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"><LogOut size={18} className="mr-2" /> {t.exit}</button>
             </header>
 
             {view === 'employees' && (
-                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                    
+                    {/* ✅ Add New Employee section moved to the top */}
+                    <div className="mb-8 border-b border-gray-700 pb-6">
+                        <h3 className="text-lg font-semibold mb-4">{t.addNewEmployee}</h3>
+                        <form onSubmit={handleAddEmployee} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                            <input type="text" name="Name" placeholder={t.payrollName} value={newEmployee.Name} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" required />
+                            <input type="text" name="PositionID" placeholder={t.positionId} value={newEmployee.PositionID} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" required />
+                            <select name="JobTitle" value={newEmployee.JobTitle} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">{JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}</select>
+                            <select name="StoreID" value={newEmployee.StoreID} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select>
+                            <input type="number" name="Rate" placeholder={t.rate} value={newEmployee.Rate} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                            <input type="number" name="BaseSalary" placeholder={t.baseSalary} value={newEmployee.BaseSalary} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                            <button type="submit" className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg col-span-full md:col-span-1 lg:col-span-2"><PlusCircle size={18} className="mr-2" /> {t.addEmployee}</button>
+                        </form>
+                    </div>
+
+                    {/* ✅ Search Bar */}
+                    <div className="flex items-center mb-4">
+                        <Search size={18} className="mr-2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder={t.searchEmployee || 'Search employee...'}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-64 bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white"
+                        />
+                    </div>
+
+                    {/* Existing top buttons */}
                     <div className="flex justify-end mb-4 gap-4">
                         <button onClick={handleForceSync} disabled={isSyncing} className="flex items-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500">
-                           <RefreshCw size={18} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> {isSyncing ? t.syncing : t.forceSync}
+                            <RefreshCw size={18} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> {isSyncing ? t.syncing : t.forceSync}
                         </button>
-                        <button onClick={handleDownloadTemplate} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"><Download size={18} className="mr-2" /> {t.downloadTemplate}</button>
+                        <button onClick={handleDownloadTemplate} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <Download size={18} className="mr-2" /> {t.downloadTemplate}
+                        </button>
                         <input type="file" ref={fileInputRef} accept=".csv" onChange={handleFileChange} className="hidden" id="csv-upload" />
-                        <label htmlFor="csv-upload" className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer"><Upload size={18} className="mr-2" /> {t.importFromCsv}</label>
+                        <label htmlFor="csv-upload" className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer">
+                            <Upload size={18} className="mr-2" /> {t.importFromCsv}
+                        </label>
                         <SaveButton onClick={handleSaveClick} saveState={saveStatus} text={t.saveChanges} />
                     </div>
+
+                    {/* Employee Table */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-400">
                             <thead className="text-xs text-gray-300 uppercase bg-gray-700">
@@ -194,7 +236,7 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
                                 </tr>
                             </thead>
                             <tbody>
-                                {employees.map(emp => (
+                                {filteredEmployees.map(emp => (
                                     <tr key={emp.EmployeeID} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/50">
                                         <td className="px-4 py-2"><input type="text" value={emp.Name} onChange={e => handleEmployeeChange(emp.EmployeeID, 'Name', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
                                         <td className="px-4 py-2"><input type="text" value={emp.PositionID} onChange={e => handleEmployeeChange(emp.EmployeeID, 'PositionID', e.target.value)} className="w-full bg-transparent focus:bg-gray-900 outline-none rounded px-2 py-1" /></td>
@@ -208,49 +250,26 @@ export const AdminPage = ({ onExit, t, language, setNotification, API_BASE_URL, 
                             </tbody>
                         </table>
                     </div>
-                    <div className="mt-8 border-t border-gray-700 pt-6">
-                        <h3 className="text-lg font-semibold mb-4">{t.addNewEmployee}</h3>
-                        <form onSubmit={handleAddEmployee} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                            <input type="text" name="Name" placeholder={t.payrollName} value={newEmployee.Name} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" required />
-                            <input type="text" name="PositionID" placeholder={t.positionId} value={newEmployee.PositionID} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" required />
-                            <select name="JobTitle" value={newEmployee.JobTitle} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">{JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}</select>
-                            <select name="StoreID" value={newEmployee.StoreID} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">{ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}</select>
-                            <input type="number" name="Rate" placeholder={t.rate} value={newEmployee.Rate} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
-                            <input type="number" name="BaseSalary" placeholder={t.baseSalary} value={newEmployee.BaseSalary} onChange={handleNewEmployeeChange} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
-                            <button type="submit" className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg col-span-full md:col-span-1 lg:col-span-2"><PlusCircle size={18} className="mr-2" /> {t.addEmployee}</button>
-                        </form>
-                    </div>
                 </div>
             )}
 
+            {/* Payroll View (unchanged) */}
             {view === 'payroll' && (
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                     <div className="flex justify-between items-center mb-4">
-                         <h2 className="text-xl font-bold text-white">{t.payroll}</h2>
-                         <div className="flex items-center gap-4">
+                        <h2 className="text-xl font-bold text-white">{t.payroll}</h2>
+                        <div className="flex items-center gap-4">
                             <select value={payrollStore} onChange={e => setPayrollStore(e.target.value)} className="bg-gray-900 border border-gray-600 rounded-md px-3 py-2">
-                               {ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}
+                                {ALL_STORES.map(store => <option key={store} value={store}>{store}</option>)}
                             </select>
-                            <WeekNavigator 
-                                currentDate={payrollDate} 
-                                setCurrentDate={setPayrollDate} 
-                                currentWeek={payrollWeek} 
-                                language={language}
-                            />
-                         </div>
+                            <WeekNavigator currentDate={payrollDate} setCurrentDate={setPayrollDate} currentWeek={payrollWeek} language={language} />
+                        </div>
                     </div>
-                    <Payroll 
-                        selectedStore={payrollStore}
-                        currentWeek={payrollWeek}
-                        currentYear={payrollYear}
-                        allEmployees={allEmployees}
-                        t={t}
-                        setNotification={setNotification}
-                        API_BASE_URL={API_BASE_URL}
-                    />
+                    <Payroll selectedStore={payrollStore} currentWeek={payrollWeek} currentYear={payrollYear} allEmployees={allEmployees} t={t} setNotification={setNotification} API_BASE_URL={API_BASE_URL} />
                 </div>
             )}
 
+            {/* Confirmation Modals (unchanged) */}
             <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleConfirmSave} title={t.confirmSave} t={t}><p>{t.confirmSaveEmployeeDb}</p></ConfirmationModal>
             <ConfirmationModal isOpen={!!importData} onClose={() => { setImportData(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} onConfirm={handleConfirmImport} title={t.importPreview} t={t}>
                 <div className="text-left max-h-60 overflow-y-auto">
