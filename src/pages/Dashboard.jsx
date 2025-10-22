@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Award, Percent, DollarSign, Hash } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
 import { DAYS_OF_WEEK, TRANSACTION_TYPES, COLORS } from '../constants';
+import { parseShift } from '../utils/helpers'; // ensure parseShift is available
 
 const GoalProgressCard = ({ title, actual, target, percent }) => {
     const progress = Math.min(percent, 100);
     const strokeColor = progress >= 100 ? '#48BB78' : (progress > 50 ? '#4299E1' : '#F56565');
-    
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between">
             <h3 className="text-lg font-semibold text-gray-300 mb-4">{title}</h3>
@@ -45,7 +45,7 @@ const KPIStatCard = ({ title, value, icon: Icon, color, valueColorClass = 'text-
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
             <div className="flex items-start justify-between">
                 <p className="text-sm text-gray-400">{title}</p>
-                <Icon size={20} className={colors[color]} />
+                {Icon && <Icon size={20} className={colors[color]} />}
             </div>
             <p className={`text-4xl font-bold mt-2 ${valueColorClass}`}>{value}</p>
         </div>
@@ -71,9 +71,9 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
                     fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
                 ]);
                 setSales(Array.isArray(salesRes) ? salesRes : []);
-                setSchedule(scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes);
-                setStcData(stcRes.status === 'not_found' ? { HourlyData: {} } : stcRes);
-                setPerformanceGoals(goalsRes.status === 'not_found' ? {} : goalsRes);
+                setSchedule(scheduleRes?.status === 'not_found' ? { rows: [] } : scheduleRes || { rows: [] });
+                setStcData(stcRes?.status === 'not_found' ? { HourlyData: {} } : stcRes || { HourlyData: {} });
+                setPerformanceGoals(goalsRes?.status === 'not_found' ? {} : goalsRes || {});
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {
@@ -83,72 +83,141 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
         fetchData();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
-    const { netSales, avgTransactionValue, unitsPerTransaction, conversionRate, leaderboardData, categorySalesData, payrollPercentage, payrollPercentageColor } = useMemo(() => {
-        let totalNetSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
-        
+    const {
+        netSales,
+        avgTransactionValue,
+        unitsPerTransaction,
+        conversionRate,
+        leaderboardData,
+        categorySalesData,
+        payrollPercentage,
+        payrollPercentageColor,
+        plannedWagePercentage,
+        plannedWageColor,
+        actualWagePercentage,
+        actualWageColor
+    } = useMemo(() => {
+        // net sales (exclude gift cards)
+        let totalNetSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + (Number(s.TotalAmount) || 0), 0);
+
+        // sales items processing (same as before)
         const employeeSalesMap = new Map();
         const categoryTotals = {};
-
         (sales || []).forEach(sale => {
             if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD || sale.Type_ === TRANSACTION_TYPES.RETURN) return;
             (sale.items || []).forEach(item => {
                 const rep = item.SalesRep;
-                const itemValue = item.Subtotal;
-                if(rep) {
-                    employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
-                }
+                const itemValue = Number(item.Subtotal) || 0;
+                if (rep) employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
                 if (!categoryTotals[item.Category]) categoryTotals[item.Category] = 0;
                 categoryTotals[item.Category] += itemValue;
             });
         });
-        
+
         const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
         const totalTransactions = merchandiseSales.length;
         const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
-        
+
+        // stc totals
         const totalTraffic = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
-            return daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0);
+            return daySum + Object.values(dayData || {}).reduce((hourSum, hour) => hourSum + (Number(hour.traffic) || 0), 0);
         }, 0);
-        
         const totalSTCTransactions = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
-            return daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0);
+            return daySum + Object.values(dayData || {}).reduce((hourSum, hour) => hourSum + (Number(hour.transactions) || 0), 0);
         }, 0);
 
-        const leaderboard = Array.from(employeeSalesMap.entries())
-            .map(([name, sales]) => ({ name, sales }))
-            .sort((a, b) => b.sales - a.sales)
-            .slice(0, 3);
-            
-        const categorySales = Object.entries(categoryTotals)
-            .map(([name, value]) => ({ name, value }))
-            .filter(d => d.value > 0)
-            .sort((a,b) => b.value - a.value);
-            
-        let totalCostForPercentage = 0;
+        const leaderboard = Array.from(employeeSalesMap.entries()).map(([name, s]) => ({ name, sales: s })).sort((a, b) => b.sales - a.sales).slice(0, 3);
+        const categorySales = Object.entries(categoryTotals).map(([name, value]) => ({ name, value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
+
+        // === compute scheduled & actual labor cost ===
         const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
 
+        // helper: lookup employee hourly rate
+        const getHourlyRateForEmployee = (emp) => {
+            if (!emp) return 0;
+            if (Number(emp.BaseSalary) > 0) {
+                return (Number(emp.BaseSalary) / 52) / 40;
+            }
+            return Number(emp.Rate) || 0;
+        };
+
+        // scheduled cost & hours: use schedule.rows and parseShift
+        let totalScheduledHours = 0;
+        let scheduledLaborCost = 0;
+        (schedule.rows || []).forEach(row => {
+            // scheduled hours from shifts (use parseShift per day)
+            let rowScheduledHours = 0;
+            (DAYS_OF_WEEK || []).forEach(dayName => {
+                const k = dayName.toLowerCase();
+                const shiftStr = row.shifts?.[k] || '';
+                const hours = parseShift(shiftStr) || 0;
+                rowScheduledHours += hours;
+            });
+            totalScheduledHours += rowScheduledHours;
+            // find employee rate
+            const emp = homeStoreEmployees.find(e => e.EmployeeID === row.EmployeeID) || {};
+            const rate = getHourlyRateForEmployee(emp);
+            scheduledLaborCost += rowScheduledHours * rate;
+        });
+
+        // actual hours & cost: prefer schedule.rows[].actualHours if available
+        let totalActualHours = 0;
+        let actualLaborCost = 0;
+        (schedule.rows || []).forEach(row => {
+            const rowActualObj = row.actualHours || {};
+            const rowActualHours = Object.values(rowActualObj || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+            totalActualHours += rowActualHours;
+            const emp = homeStoreEmployees.find(e => e.EmployeeID === row.EmployeeID) || {};
+            const rate = getHourlyRateForEmployee(emp);
+            actualLaborCost += rowActualHours * rate;
+        });
+
+        // weekly target / goal:
+        const weeklyGoal = Number(performanceGoals?.WeeklySalesTarget) || 0;
+
+        // ===== Planned Wage Cost Percentage =====
+        // formula: ((scheduled labor cost) + 2% of Weekly Goal) / Weekly Goal * 100
+        let plannedPct = 0;
+        if (weeklyGoal > 0) {
+            plannedPct = ((scheduledLaborCost + (0.02 * weeklyGoal)) / weeklyGoal) * 100;
+        } else plannedPct = 0;
+
+        // ===== Actual Wage Cost Percentage =====
+        // formula: ((actual labor cost) + 2% of weekly sales) / weekly sales * 100
+        let actualPct = 0;
+        if (totalNetSales > 0) {
+            actualPct = ((actualLaborCost + (0.02 * totalNetSales)) / totalNetSales) * 100;
+        } else actualPct = 0;
+
+        // color thresholds — keep the same as payrollPercentage logic
+        const pctToColor = (p) => {
+            if (p >= 20) return 'text-red-400';
+            if (p > 16 && p < 20) return 'text-yellow-400';
+            return 'text-green-400';
+        };
+
+        // also compute previous payroll percentage (existing behavior preserved)
+        let totalCostForPercentage = 0;
         homeStoreEmployees.forEach(emp => {
             let totalHours = 0;
             const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
             if (scheduleRow) {
                 totalHours = Object.values(scheduleRow.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
             }
-
-            if (emp.BaseSalary > 0) {
-                const effectiveHourlyRate = (emp.BaseSalary / 52) / 40;
+            if (Number(emp.BaseSalary) > 0) {
+                const effectiveHourlyRate = (Number(emp.BaseSalary) / 52) / 40;
                 totalCostForPercentage += (effectiveHourlyRate * totalHours);
             } else {
                 const regularHours = Math.min(totalHours, 40);
                 const otHours = Math.max(0, totalHours - 40);
-                const gross = (emp.Rate * regularHours) + (emp.Rate * 1.5 * otHours);
+                const gross = (Number(emp.Rate) * regularHours) + (Number(emp.Rate) * 1.5 * otHours);
                 totalCostForPercentage += gross;
             }
         });
-        
-        const percentage = totalNetSales > 0 ? (totalCostForPercentage / totalNetSales) * 100 : 0;
-        let colorClass = 'text-green-400';
-        if (percentage > 16 && percentage < 20) colorClass = 'text-yellow-400';
-        else if (percentage >= 20) colorClass = 'text-red-400';
+        const payrollPct = totalNetSales > 0 ? (totalCostForPercentage / totalNetSales) * 100 : 0;
+        let payrollColor = 'text-green-400';
+        if (payrollPct > 16 && payrollPct < 20) payrollColor = 'text-yellow-400';
+        else if (payrollPct >= 20) payrollColor = 'text-red-400';
 
         return {
             netSales: totalNetSales,
@@ -157,16 +226,19 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
             conversionRate: totalTraffic > 0 ? (totalSTCTransactions / totalTraffic) * 100 : 0,
             leaderboardData: leaderboard,
             categorySalesData: categorySales,
-            payrollPercentage: percentage,
-            payrollPercentageColor: colorClass
+            payrollPercentage: payrollPct,
+            payrollPercentageColor: payrollColor,
+            plannedWagePercentage: plannedPct,
+            plannedWageColor: pctToColor(plannedPct),
+            actualWagePercentage: actualPct,
+            actualWageColor: pctToColor(actualPct)
         };
-    }, [sales, stcData, schedule, allEmployees, selectedStore]);
-    
+    }, [sales, stcData, schedule, allEmployees, selectedStore, performanceGoals]);
+
     const todayString = DAYS_OF_WEEK[new Date().getDay()];
     const dailyTarget = JSON.parse(performanceGoals.DailyGoals || '{}')?.[todayString.toLowerCase()] || 0;
-    const dailyActual = (sales || []).filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
+    const dailyActual = (sales || []).filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + (Number(s.TotalAmount) || 0), 0);
     const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
-
     const weeklyTarget = performanceGoals.WeeklySalesTarget || 0;
     const weeklyPercent = weeklyTarget > 0 ? (netSales / weeklyTarget) * 100 : 0;
 
@@ -182,6 +254,10 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
                 <KPIStatCard title={t.conversionRate} value={`${conversionRate.toFixed(2)}%`} icon={Percent} color="purple" />
                 <KPIStatCard title={t.dollarsPerTransaction} value={formatCurrency(avgTransactionValue)} icon={DollarSign} color="blue" />
                 <KPIStatCard title={t.unitsPerTransaction} value={unitsPerTransaction.toFixed(2)} icon={Hash} color="orange" />
+                {/* Planned and Actual Wage Percentage tiles */}
+                <KPIStatCard title={"Planned Wage Cost Percentage"} value={`${plannedWagePercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={plannedWageColor} />
+                <KPIStatCard title={"Actual Wage Cost Percentage"} value={`${actualWagePercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={actualWageColor} />
+                {/* existing payroll tile retained if you still want to show original */}
                 <KPIStatCard title={t.payrollPercentage} value={`${payrollPercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={payrollPercentageColor} />
             </div>
             <div className="lg:col-span-1 space-y-6">
@@ -200,20 +276,4 @@ export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, current
                      </div>
                 </div>
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-200">{t.salesByCategory}</h3>
-                    <div className="space-y-3 pr-2 max-h-52 overflow-y-auto">
-                        {categorySalesData.map((cat, index) => (
-                            <div key={cat.name} className="flex justify-between items-center text-sm">
-                                <div className="flex items-center">
-                                    <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                                    <span className="text-gray-300">{t[cat.name] || cat.name}</span>
-                                </div>
-                                <span className="font-bold text-white">{formatCurrency(cat.value)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+                    <h3 className="text-lg font-semibold mb
