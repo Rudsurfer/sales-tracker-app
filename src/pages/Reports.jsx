@@ -1,8 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
+import {
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
+    LineChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    Line
+} from 'recharts';
 import { RefreshCw } from 'lucide-react';
-import { formatCurrency } from '../utils/helpers';
-import { TRANSACTION_TYPES, SALE_CATEGORIES, COLORS } from '../constants';
+import { formatCurrency, parseShift } from '../utils/helpers';
+import { TRANSACTION_TYPES, SALE_CATEGORIES, COLORS, DAYS_OF_WEEK } from '../constants';
 
 const ReportStatCard = ({ title, value }) => (
     <div className="bg-gray-700/50 p-4 rounded-lg text-center">
@@ -11,7 +23,7 @@ const ReportStatCard = ({ title, value }) => (
     </div>
 );
 
-const TrendChart = ({ data, dataKey, title, color, formatter }) => (
+const TrendChart = ({ data, dataKey, title, color, formatter, secondKey, secondColor, secondName }) => (
     <div>
         <h3 className="text-lg font-semibold text-gray-200 mb-2">{title}</h3>
         <ResponsiveContainer width="100%" height={250}>
@@ -22,10 +34,13 @@ const TrendChart = ({ data, dataKey, title, color, formatter }) => (
                 <Tooltip
                     contentStyle={{ backgroundColor: '#2D3748', border: 'none', color: '#E2E8F0', borderRadius: '0.5rem' }}
                     labelStyle={{ fontWeight: 'bold' }}
-                    formatter={(value) => [formatter(value), title]}
+                    formatter={(value, name) => [formatter(value), name]}
                 />
                 <Legend />
                 <Line type="monotone" dataKey={dataKey} name={title} stroke={color} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 8 }} />
+                {secondKey && (
+                    <Line type="monotone" dataKey={secondKey} name={secondName} stroke={secondColor} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 8 }} />
+                )}
             </LineChart>
         </ResponsiveContainer>
     </div>
@@ -93,6 +108,7 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
         fetchData();
     }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
+    // Trend data now includes plannedWagePct and actualWagePct per week
     const trendData = useMemo(() => {
         return historicalData.map(weeklyData => {
             const { sales, schedule, stc } = weeklyData;
@@ -106,6 +122,46 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
             const totalSTCTransactions = Object.values(stc.HourlyData || {}).reduce((daySum, dayData) => daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0), 0);
             const totalHours = (schedule.rows || []).reduce((sum, row) => sum + Object.values(row.actualHours || {}).reduce((hSum, h) => hSum + Number(h), 0), 0);
 
+            // ---- NEW: compute planned & actual wage % for this historical week ----
+            const storeEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
+            const getHourlyRate = (emp) => {
+                if (!emp) return 0;
+                if (emp.BaseSalary && Number(emp.BaseSalary) > 0) {
+                    return (Number(emp.BaseSalary) / 52) / 40;
+                }
+                return Number(emp.Rate) || 0;
+            };
+
+            // Scheduled: parse shifts (scheduled hours) and compute scheduled labor cost
+            let scheduledLaborCost = 0;
+            let scheduledHoursTotal = 0;
+            (schedule.rows || []).forEach(row => {
+                const emp = storeEmployees.find(e => e.EmployeeID === row.EmployeeID) || {};
+                const rate = getHourlyRate(emp);
+                let rowScheduledHours = 0;
+                (DAYS_OF_WEEK || []).forEach(day => {
+                    const shift = row.shifts?.[day.toLowerCase()] || '';
+                    const hrs = parseShift(shift) || 0;
+                    rowScheduledHours += hrs;
+                });
+                scheduledHoursTotal += rowScheduledHours;
+                scheduledLaborCost += rowScheduledHours * rate;
+            });
+
+            // Actual: use actualHours recorded and compute labor cost
+            let actualLaborCost = 0;
+            let actualHoursTotal = 0;
+            (schedule.rows || []).forEach(row => {
+                const emp = storeEmployees.find(e => e.EmployeeID === row.EmployeeID) || {};
+                const rate = getHourlyRate(emp);
+                const rowActualHours = Object.values(row.actualHours || {}).reduce((s, h) => s + (Number(h) || 0), 0);
+                actualHoursTotal += rowActualHours;
+                actualLaborCost += rowActualHours * rate;
+            });
+
+            const plannedWagePct = netSales > 0 ? ((scheduledLaborCost + (0.02 * netSales)) / netSales) * 100 : 0;
+            const actualWagePct = netSales > 0 ? ((actualLaborCost + (0.02 * netSales)) / netSales) * 100 : 0;
+
             return {
                 name: `W${weeklyData.week}`,
                 netSales,
@@ -113,9 +169,11 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
                 dollarsPerHour: totalHours > 0 ? netSales / totalHours : 0,
                 avgTransactionValue: totalTransactions > 0 ? netSales / totalTransactions : 0,
                 unitsPerTransaction: totalTransactions > 0 ? totalUnits / totalTransactions : 0,
+                plannedWagePct,
+                actualWagePct
             };
         });
-    }, [historicalData]);
+    }, [historicalData, allEmployees, selectedStore]);
 
     const currentWeekMetrics = useMemo(() => {
         const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
@@ -292,6 +350,17 @@ export const Reports = ({ selectedStore, currentYear, currentWeek, t, API_BASE_U
                             <TrendChart data={trendData} dataKey="conversionRate" title={t.conversionRate} color="#82ca9d" formatter={(v) => `${v.toFixed(2)}%`} />
                             <TrendChart data={trendData} dataKey="dollarsPerHour" title={t.dph} color="#ffc658" formatter={formatCurrency} />
                             <TrendChart data={trendData} dataKey="avgTransactionValue" title={t.dpt} color="#ff8042" formatter={formatCurrency} />
+                            {/* NEW: Wage Cost % trend chart (Planned + Actual). This is the only new chart added. */}
+                            <TrendChart
+                                data={trendData}
+                                dataKey="plannedWagePct"
+                                title={`${t.plannedWage || 'Planned Wage %'}`}
+                                color="#FF7300"
+                                secondKey="actualWagePct"
+                                secondColor="#00C49F"
+                                secondName={`${t.actualWage || 'Actual Wage %'}`}
+                                formatter={(v) => `${v.toFixed(2)}%`}
+                            />
                         </div>
                     )}
                 </div>
