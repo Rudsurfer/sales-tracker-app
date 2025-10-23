@@ -1,219 +1,255 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Award, Percent, DollarSign, Hash } from 'lucide-react';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, parseShift } from '../utils/helpers';
 import { DAYS_OF_WEEK, TRANSACTION_TYPES, COLORS } from '../constants';
 
 const GoalProgressCard = ({ title, actual, target, percent }) => {
-    const progress = Math.min(percent, 100);
-    const strokeColor = progress >= 100 ? '#48BB78' : (progress > 50 ? '#4299E1' : '#F56565');
-    
-    return (
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between">
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">{title}</h3>
-            <div className="relative w-32 h-32 mx-auto">
-                <svg className="w-full h-full" viewBox="0 0 36 36">
-                    <path className="text-gray-700" strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path
-                        className="transition-all duration-500"
-                        stroke={strokeColor}
-                        strokeWidth="3"
-                        strokeDasharray={`${progress}, 100`}
-                        strokeLinecap="round"
-                        fill="none"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-white">{percent.toFixed(0)}%</span>
-                </div>
-            </div>
-            <div className="text-center mt-4">
-                <p className="text-2xl font-bold text-white">{formatCurrency(actual)}</p>
-                <p className="text-sm text-gray-400">/ {formatCurrency(target)}</p>
-            </div>
+  const progress = Math.min(percent, 100);
+  const strokeColor = progress >= 100 ? '#48BB78' : (progress > 50 ? '#4299E1' : '#F56565');
+
+  return (
+    <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between">
+      <h3 className="text-lg font-semibold text-gray-300 mb-4">{title}</h3>
+      <div className="relative w-32 h-32 mx-auto">
+        <svg className="w-full h-full" viewBox="0 0 36 36">
+          <path className="text-gray-700" strokeWidth="3" fill="none"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          <path
+            className="transition-all duration-500"
+            stroke={strokeColor}
+            strokeWidth="3"
+            strokeDasharray={`${progress}, 100`}
+            strokeLinecap="round"
+            fill="none"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-2xl font-bold text-white">{percent.toFixed(0)}%</span>
         </div>
-    );
+      </div>
+      <div className="text-center mt-4">
+        <p className="text-2xl font-bold text-white">{formatCurrency(actual)}</p>
+        <p className="text-sm text-gray-400">/ {formatCurrency(target)}</p>
+      </div>
+    </div>
+  );
 };
 
 const KPIStatCard = ({ title, value, icon: Icon, color, valueColorClass = 'text-white' }) => {
-    const colors = {
-        purple: 'text-purple-400',
-        blue: 'text-blue-400',
-        orange: 'text-orange-400',
-    };
-    return (
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <div className="flex items-start justify-between">
-                <p className="text-sm text-gray-400">{title}</p>
-                <Icon size={20} className={colors[color]} />
-            </div>
-            <p className={`text-4xl font-bold mt-2 ${valueColorClass}`}>{value}</p>
-        </div>
-    );
+  const colors = {
+    purple: 'text-purple-400',
+    blue: 'text-blue-400',
+    orange: 'text-orange-400',
+  };
+  return (
+    <div className="bg-gray-800 p-6 rounded-lg shadow-lg h-full flex flex-col justify-between">
+      <div className="flex items-start justify-between">
+        <p className="text-sm text-gray-400">{title}</p>
+        {Icon && <Icon size={20} className={colors[color]} />}
+      </div>
+      <p className={`text-4xl font-bold mt-2 ${valueColorClass}`}>{value}</p>
+    </div>
+  );
 };
 
 export const Dashboard = ({ t, allEmployees, selectedStore, currentWeek, currentYear, API_BASE_URL }) => {
-    const [sales, setSales] = useState([]);
-    const [schedule, setSchedule] = useState({ rows: [] });
-    const [stcData, setStcData] = useState({ HourlyData: {} });
-    const [performanceGoals, setPerformanceGoals] = useState({});
-    const [isLoading, setIsLoading] = useState(true);
+  const [sales, setSales] = useState([]);
+  const [schedule, setSchedule] = useState({ rows: [] });
+  const [stcData, setStcData] = useState({ HourlyData: {} });
+  const [performanceGoals, setPerformanceGoals] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!selectedStore || !currentWeek || !currentYear) return;
-            setIsLoading(true);
-            try {
-                const [salesRes, scheduleRes, stcRes, goalsRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
-                    fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
-                    fetch(`${API_BASE_URL}/stc/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
-                    fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
-                ]);
-                setSales(Array.isArray(salesRes) ? salesRes : []);
-                setSchedule(scheduleRes.status === 'not_found' ? { rows: [] } : scheduleRes);
-                setStcData(stcRes.status === 'not_found' ? { HourlyData: {} } : stcRes);
-                setPerformanceGoals(goalsRes.status === 'not_found' ? {} : goalsRes);
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!selectedStore || !currentWeek || !currentYear) return;
+      setIsLoading(true);
+      try {
+        const [salesRes, scheduleRes, stcRes, goalsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/sales/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+          fetch(`${API_BASE_URL}/schedule/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+          fetch(`${API_BASE_URL}/stc/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json()),
+          fetch(`${API_BASE_URL}/goals/${selectedStore}/${currentWeek}/${currentYear}`).then(res => res.json())
+        ]);
 
-    const { netSales, avgTransactionValue, unitsPerTransaction, conversionRate, leaderboardData, categorySalesData, payrollPercentage, payrollPercentageColor } = useMemo(() => {
-        let totalNetSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
-        
-        const employeeSalesMap = new Map();
-        const categoryTotals = {};
+        setSales(Array.isArray(salesRes) ? salesRes : []);
+        setSchedule(scheduleRes?.status === 'not_found' ? { rows: [] } : scheduleRes || { rows: [] });
+        setStcData(stcRes?.status === 'not_found' ? { HourlyData: {} } : stcRes || { HourlyData: {} });
+        setPerformanceGoals(goalsRes?.status === 'not_found' ? {} : goalsRes || {});
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [selectedStore, currentWeek, currentYear, API_BASE_URL]);
 
-        (sales || []).forEach(sale => {
-            if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD || sale.Type_ === TRANSACTION_TYPES.RETURN) return;
-            (sale.items || []).forEach(item => {
-                const rep = item.SalesRep;
-                const itemValue = item.Subtotal;
-                if(rep) {
-                    employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
-                }
-                if (!categoryTotals[item.Category]) categoryTotals[item.Category] = 0;
-                categoryTotals[item.Category] += itemValue;
-            });
-        });
-        
-        const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
-        const totalTransactions = merchandiseSales.length;
-        const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
-        
-        const totalTraffic = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
-            return daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.traffic || 0), 0);
-        }, 0);
-        
-        const totalSTCTransactions = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
-            return daySum + Object.values(dayData).reduce((hourSum, hour) => hourSum + (hour.transactions || 0), 0);
-        }, 0);
+  const {
+    netSales,
+    avgTransactionValue,
+    unitsPerTransaction,
+    conversionRate,
+    leaderboardData,
+    categorySalesData,
+    plannedWagePercentage,
+    plannedWageColor,
+    actualWagePercentage,
+    actualWageColor
+  } = useMemo(() => {
+    let totalNetSales = (sales || [])
+      .filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD)
+      .reduce((sum, s) => sum + (Number(s.TotalAmount) || 0), 0);
 
-        const leaderboard = Array.from(employeeSalesMap.entries())
-            .map(([name, sales]) => ({ name, sales }))
-            .sort((a, b) => b.sales - a.sales)
-            .slice(0, 3);
-            
-        const categorySales = Object.entries(categoryTotals)
-            .map(([name, value]) => ({ name, value }))
-            .filter(d => d.value > 0)
-            .sort((a,b) => b.value - a.value);
-            
-        let totalCostForPercentage = 0;
-        const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
+    const employeeSalesMap = new Map();
+    const categoryTotals = {};
 
-        homeStoreEmployees.forEach(emp => {
-            let totalHours = 0;
-            const scheduleRow = schedule.rows?.find(r => r.EmployeeID === emp.EmployeeID);
-            if (scheduleRow) {
-                totalHours = Object.values(scheduleRow.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
-            }
+    (sales || []).forEach(sale => {
+      if (sale.Type_ === TRANSACTION_TYPES.GIFT_CARD || sale.Type_ === TRANSACTION_TYPES.RETURN) return;
+      (sale.items || []).forEach(item => {
+        const rep = item.SalesRep;
+        const itemValue = Number(item.Subtotal) || 0;
+        if (rep) employeeSalesMap.set(rep, (employeeSalesMap.get(rep) || 0) + itemValue);
+        if (!categoryTotals[item.Category]) categoryTotals[item.Category] = 0;
+        categoryTotals[item.Category] += itemValue;
+      });
+    });
 
-            if (emp.BaseSalary > 0) {
-                const effectiveHourlyRate = (emp.BaseSalary / 52) / 40;
-                totalCostForPercentage += (effectiveHourlyRate * totalHours);
-            } else {
-                const regularHours = Math.min(totalHours, 40);
-                const otHours = Math.max(0, totalHours - 40);
-                const gross = (emp.Rate * regularHours) + (emp.Rate * 1.5 * otHours);
-                totalCostForPercentage += gross;
-            }
-        });
-        
-        const percentage = totalNetSales > 0 ? (totalCostForPercentage / totalNetSales) * 100 : 0;
-        let colorClass = 'text-green-400';
-        if (percentage > 16 && percentage < 20) colorClass = 'text-yellow-400';
-        else if (percentage >= 20) colorClass = 'text-red-400';
+    const merchandiseSales = (sales || []).filter(s => s.Type_ !== TRANSACTION_TYPES.GIFT_CARD && s.Type_ !== TRANSACTION_TYPES.RETURN);
+    const totalTransactions = merchandiseSales.length;
+    const totalUnits = merchandiseSales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.Quantity || 0), 0), 0);
 
-        return {
-            netSales: totalNetSales,
-            avgTransactionValue: totalTransactions > 0 ? totalNetSales / totalTransactions : 0,
-            unitsPerTransaction: totalTransactions > 0 ? totalUnits / totalTransactions : 0,
-            conversionRate: totalTraffic > 0 ? (totalSTCTransactions / totalTraffic) * 100 : 0,
-            leaderboardData: leaderboard,
-            categorySalesData: categorySales,
-            payrollPercentage: percentage,
-            payrollPercentageColor: colorClass
-        };
-    }, [sales, stcData, schedule, allEmployees, selectedStore]);
-    
-    const todayString = DAYS_OF_WEEK[new Date().getDay()];
-    const dailyTarget = JSON.parse(performanceGoals.DailyGoals || '{}')?.[todayString.toLowerCase()] || 0;
-    const dailyActual = (sales || []).filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD).reduce((sum, s) => sum + s.TotalAmount, 0);
-    const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
+    const totalTraffic = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
+      return daySum + Object.values(dayData || {}).reduce((hourSum, hour) => hourSum + (Number(hour.traffic) || 0), 0);
+    }, 0);
+    const totalSTCTransactions = Object.values(stcData.HourlyData || {}).reduce((daySum, dayData) => {
+      return daySum + Object.values(dayData || {}).reduce((hourSum, hour) => hourSum + (Number(hour.transactions) || 0), 0);
+    }, 0);
 
-    const weeklyTarget = performanceGoals.WeeklySalesTarget || 0;
-    const weeklyPercent = weeklyTarget > 0 ? (netSales / weeklyTarget) * 100 : 0;
+    const leaderboard = Array.from(employeeSalesMap.entries()).map(([name, s]) => ({ name, sales: s }))
+      .sort((a, b) => b.sales - a.sales).slice(0, 3);
+    const categorySales = Object.entries(categoryTotals)
+      .map(([name, value]) => ({ name, value }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
 
-    if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
-    }
+    const homeStoreEmployees = allEmployees.filter(e => e.StoreID === selectedStore);
+    const getHourlyRateForEmployee = (emp) => {
+      if (!emp) return 0;
+      if (Number(emp.BaseSalary) > 0) return (Number(emp.BaseSalary) / 52) / 40;
+      return Number(emp.Rate) || 0;
+    };
 
+    let totalScheduledHours = 0;
+    let scheduledLaborCost = 0;
+    (schedule.rows || []).forEach(row => {
+      let rowScheduledHours = 0;
+      (DAYS_OF_WEEK || []).forEach(dayName => {
+        const shiftStr = row.shifts?.[dayName.toLowerCase()] || '';
+        rowScheduledHours += parseShift(shiftStr) || 0;
+      });
+      totalScheduledHours += rowScheduledHours;
+      const emp = homeStoreEmployees.find(e => e.EmployeeID === row.EmployeeID) || {};
+      scheduledLaborCost += rowScheduledHours * getHourlyRateForEmployee(emp);
+    });
+
+    let totalActualHours = 0;
+    let actualLaborCost = 0;
+    (schedule.rows || []).forEach(row => {
+      const rowActualHours = Object.values(row.actualHours || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+      totalActualHours += rowActualHours;
+      const emp = homeStoreEmployees.find(e => e.EmployeeID === row.EmployeeID) || {};
+      actualLaborCost += rowActualHours * getHourlyRateForEmployee(emp);
+    });
+
+    const weeklyGoal = Number(performanceGoals?.WeeklySalesTarget) || 0;
+
+    const plannedPct = weeklyGoal > 0 ? ((scheduledLaborCost + (0.02 * weeklyGoal)) / weeklyGoal) * 100 : 0;
+    const actualPct = totalNetSales > 0 ? ((actualLaborCost + (0.02 * totalNetSales)) / totalNetSales) * 100 : 0;
+
+    const pctToColor = (p) => {
+      if (p >= 20) return 'text-red-400';
+      if (p > 16 && p < 20) return 'text-yellow-400';
+      return 'text-green-400';
+    };
+
+    return {
+      netSales: totalNetSales,
+      avgTransactionValue: totalTransactions > 0 ? totalNetSales / totalTransactions : 0,
+      unitsPerTransaction: totalTransactions > 0 ? totalUnits / totalTransactions : 0,
+      conversionRate: totalTraffic > 0 ? (totalSTCTransactions / totalTraffic) * 100 : 0,
+      leaderboardData: leaderboard,
+      categorySalesData: categorySales,
+      plannedWagePercentage: plannedPct,
+      plannedWageColor: pctToColor(plannedPct),
+      actualWagePercentage: actualPct,
+      actualWageColor: pctToColor(actualPct),
+    };
+  }, [sales, stcData, schedule, allEmployees, selectedStore, performanceGoals]);
+
+  const todayString = DAYS_OF_WEEK[new Date().getDay()];
+  const dailyTarget = JSON.parse(performanceGoals.DailyGoals || '{}')?.[todayString.toLowerCase()] || 0;
+  const dailyActual = (sales || []).filter(s => s.NameDay === todayString && s.Type_ !== TRANSACTION_TYPES.GIFT_CARD)
+    .reduce((sum, s) => sum + (Number(s.TotalAmount) || 0), 0);
+  const dailyPercent = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
+  const weeklyTarget = performanceGoals.WeeklySalesTarget || 0;
+  const weeklyPercent = weeklyTarget > 0 ? (netSales / weeklyTarget) * 100 : 0;
+
+  if (isLoading) {
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <GoalProgressCard title={t.todaysGoal} actual={dailyActual} target={dailyTarget} percent={dailyPercent} />
-                <GoalProgressCard title={t.weeklyGoal} actual={netSales} target={weeklyTarget} percent={weeklyPercent} />
-                <KPIStatCard title={t.conversionRate} value={`${conversionRate.toFixed(2)}%`} icon={Percent} color="purple" />
-                <KPIStatCard title={t.dollarsPerTransaction} value={formatCurrency(avgTransactionValue)} icon={DollarSign} color="blue" />
-                <KPIStatCard title={t.unitsPerTransaction} value={unitsPerTransaction.toFixed(2)} icon={Hash} color="orange" />
-                <KPIStatCard title={t.payrollPercentage} value={`${payrollPercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={payrollPercentageColor} />
-            </div>
-            <div className="lg:col-span-1 space-y-6">
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                     <h3 className="text-lg font-semibold mb-4 text-gray-200">{t.topSellers}</h3>
-                     <div className="space-y-4">
-                         {leaderboardData.map((seller, index) => (
-                             <div key={seller.name} className="flex items-center">
-                                 <Award size={24} className={index === 0 ? 'text-yellow-400' : (index === 1 ? 'text-gray-400' : 'text-yellow-600')} />
-                                 <div className="ml-4 flex-grow">
-                                     <p className="font-bold text-white">{seller.name}</p>
-                                     <p className="text-sm text-gray-400">{formatCurrency(seller.sales)}</p>
-                                 </div>
-                             </div>
-                         ))}
-                     </div>
-                </div>
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-200">{t.salesByCategory}</h3>
-                    <div className="space-y-3 pr-2 max-h-52 overflow-y-auto">
-                        {categorySalesData.map((cat, index) => (
-                            <div key={cat.name} className="flex justify-between items-center text-sm">
-                                <div className="flex items-center">
-                                    <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                                    <span className="text-gray-300">{t[cat.name] || cat.name}</span>
-                                </div>
-                                <span className="font-bold text-white">{formatCurrency(cat.value)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
     );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <GoalProgressCard title={t.todaysGoal} actual={dailyActual} target={dailyTarget} percent={dailyPercent} />
+        <GoalProgressCard title={t.weeklyGoal} actual={netSales} target={weeklyTarget} percent={weeklyPercent} />
+        <KPIStatCard title={t.conversionRate} value={`${conversionRate.toFixed(2)}%`} icon={Percent} color="purple" />
+        <KPIStatCard title={t.dollarsPerTransaction} value={formatCurrency(avgTransactionValue)} icon={DollarSign} color="blue" />
+        <KPIStatCard title={t.unitsPerTransaction} value={unitsPerTransaction.toFixed(2)} icon={Hash} color="orange" />
+
+        {/* Side-by-side wage tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <KPIStatCard title="Planned Wage Cost Percentage" value={`${plannedWagePercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={plannedWageColor} />
+          <KPIStatCard title="Actual Wage Cost Percentage" value={`${actualWagePercentage.toFixed(2)}%`} icon={Percent} color="purple" valueColorClass={actualWageColor} />
+        </div>
+      </div>
+
+      <div className="lg:col-span-1 space-y-6">
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+          <h3 className="text-lg font-semibold mb-4 text-gray-200">{t.topSellers}</h3>
+          <div className="space-y-4">
+            {leaderboardData.map((seller, index) => (
+              <div key={seller.name} className="flex items-center">
+                <Award size={24} className={index === 0 ? 'text-yellow-400' : (index === 1 ? 'text-gray-400' : 'text-yellow-600')} />
+                <div className="ml-4 flex-grow">
+                  <p className="font-bold text-white">{seller.name}</p>
+                  <p className="text-sm text-gray-400">{formatCurrency(seller.sales)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+          <h3 className="text-lg font-semibold mb-4 text-gray-200">{t.salesByCategory}</h3>
+          <div className="space-y-3 pr-2 max-h-52 overflow-y-auto">
+            {categorySalesData.map((cat, index) => (
+              <div key={cat.name} className="flex justify-between items-center text-sm">
+                <div className="flex items-center">
+                  <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                  <span className="text-gray-300">{t[cat.name] || cat.name}</span>
+                </div>
+                <span className="font-bold text-white">{formatCurrency(cat.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
