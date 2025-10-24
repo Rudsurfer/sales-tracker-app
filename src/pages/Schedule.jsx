@@ -1,3 +1,4 @@
+// src/pages/schedule.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlusCircle, Trash2, Target, X, UserPlus, Download, Lock, Unlock, Edit2 } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
@@ -5,6 +6,7 @@ import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
+/* ---------------------- helpers ---------------------- */
 const decimalHoursToHM = (decimalHours) => {
     if (!decimalHours || decimalHours <= 0) return "0h 0m";
     const totalMinutes = Math.round(decimalHours * 60);
@@ -12,6 +14,47 @@ const decimalHoursToHM = (decimalHours) => {
     const minutes = totalMinutes % 60;
     return `${hours}h ${minutes}m`;
 };
+
+/* compute total hours from four timestamps in ISO format (strings) */
+const computeHoursFromFour = ({ ClockInAM, ClockOutLunch, ClockInLunch, ClockOutPM }) => {
+    let total = 0;
+    if (ClockInAM && ClockOutLunch) {
+        total += (new Date(ClockOutLunch) - new Date(ClockInAM)) / (1000 * 60 * 60);
+    }
+    if (ClockInLunch && ClockOutPM) {
+        total += (new Date(ClockOutPM) - new Date(ClockInLunch)) / (1000 * 60 * 60);
+    }
+    // guard negative or NaN
+    if (!isFinite(total) || total < 0) return 0;
+    return total;
+};
+
+/* pick the "best"/latest log for a day by max timestamp across fields */
+const pickLatestLogForGroup = (logs) => {
+    if (!logs || logs.length === 0) return null;
+    let best = logs[0];
+    const maxTime = (log) => {
+        const times = [];
+        ['ClockInAM','ClockOutLunch','ClockInLunch','ClockOutPM','ClockIn','ClockOut'].forEach(k => {
+            if (log[k]) {
+                const t = Date.parse(log[k]);
+                if (!isNaN(t)) times.push(t);
+            }
+        });
+        return times.length ? Math.max(...times) : 0;
+    };
+    let bestTime = maxTime(best);
+    for (let i = 1; i < logs.length; i++) {
+        const mt = maxTime(logs[i]);
+        if (mt > bestTime) {
+            best = logs[i];
+            bestTime = mt;
+        }
+    }
+    return best;
+};
+
+/* ---------------------- Modals ---------------------- */
 
 const DailyObjectiveModal = ({ row, onRowChange, onClose, t, language }) => {
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
@@ -84,18 +127,27 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
 };
 
 const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => {
-    const [clockIn, setClockIn] = useState('');
-    const [clockOut, setClockOut] = useState('');
+    const [clockInAM, setClockInAM] = useState('');
+    const [clockOutLunch, setClockOutLunch] = useState('');
+    const [clockInLunch, setClockInLunch] = useState('');
+    const [clockOutPM, setClockOutPM] = useState('');
     const [reason, setReason] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) {
+            setClockInAM(''); setClockOutLunch(''); setClockInLunch(''); setClockOutPM(''); setReason('');
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleSave = () => {
-        if (!clockIn || !clockOut || !reason) {
-            alert(t.fillAllFields);
+        // allow partial entries but at least one timestamp required
+        if (!clockInAM && !clockOutLunch && !clockInLunch && !clockOutPM) {
+            alert(t.fillAllFields || "Please enter at least one timestamp.");
             return;
         }
-        onSave({ clockIn, clockOut, reason });
+        onSave({ clockInAM, clockOutLunch, clockInLunch, clockOutPM, reason });
         onClose();
     };
 
@@ -103,17 +155,25 @@ const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) 
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 no-print">
             <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">Time Adjustment for {employeeName} on {day}</h3>
+                    <h3 className="text-xl font-bold text-white">{t.timeAdjustmentFor || 'Time Adjustment'} {employeeName} ({day})</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
                 </div>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In Time (e.g., 9:00am)</label>
-                        <input type="text" value={clockIn} onChange={e => setClockIn(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In (Start of Day)</label>
+                        <input type="text" value={clockInAM} onChange={e => setClockInAM(e.target.value)} placeholder="9:00am" className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out Time (e.g., 5:30pm)</label>
-                        <input type="text" value={clockOut} onChange={e => setClockOut(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out (Lunch)</label>
+                        <input type="text" value={clockOutLunch} onChange={e => setClockOutLunch(e.target.value)} placeholder="12:30pm" className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In (After Lunch)</label>
+                        <input type="text" value={clockInLunch} onChange={e => setClockInLunch(e.target.value)} placeholder="1:00pm" className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out (End of Day)</label>
+                        <input type="text" value={clockOutPM} onChange={e => setClockOutPM(e.target.value)} placeholder="5:00pm" className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">Reason for Adjustment</label>
@@ -129,6 +189,8 @@ const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) 
     );
 };
 
+/* ---------------------- Main Schedule component ---------------------- */
+
 export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
     const [schedule, setSchedule] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -141,6 +203,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     const [isManagerPasscodeOpen, setIsManagerPasscodeOpen] = useState(false);
     const weekDays = language === 'fr' ? DAYS_OF_WEEK_FR : DAYS_OF_WEEK;
 
+    /* ---------------------- fetchSchedule ---------------------- */
     const fetchSchedule = async () => {
         setIsLoading(true);
         try {
@@ -152,7 +215,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             let scheduleData;
             if (scheduleRes.ok) {
                 const data = await scheduleRes.json();
-                 if (data.status === 'not_found' || !data.rows) {
+                if (data.status === 'not_found' || !data.rows) {
                     const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
                     const newScheduleRows = storeEmployees.map(emp => ({
                         EmployeeID: emp.EmployeeID, Name: emp.Name, PositionID: emp.PositionID, JobTitle: emp.JobTitle,
@@ -173,24 +236,55 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             
             const timeLogs = timeLogsRes.ok ? await timeLogsRes.json() : [];
 
+            // Build actualHours: group logs by EmployeeID and by day key
+            const logsByEmployee = {};
+            (timeLogs || []).forEach(log => {
+                const empId = log.EmployeeID;
+                if (!empId) return;
+                // determine dayKey - prefer explicit Day, otherwise infer from available timestamps
+                let dayKey = null;
+                if (log.Day) {
+                    dayKey = String(log.Day).toLowerCase();
+                } else {
+                    const sampleTs = log.ClockInAM || log.ClockIn || log.ClockOutLunch || log.ClockInLunch || log.ClockOut || log.ClockOutPM;
+                    if (sampleTs) {
+                        const d = new Date(sampleTs);
+                        dayKey = DAYS_OF_WEEK[d.getUTCDay()].toLowerCase();
+                    }
+                }
+                if (!dayKey) return;
+                logsByEmployee[empId] = logsByEmployee[empId] || {};
+                logsByEmployee[empId][dayKey] = logsByEmployee[empId][dayKey] || [];
+                logsByEmployee[empId][dayKey].push(log);
+            });
+
+            // For each schedule row, compute daily actualHours by picking latest log for that employee/day and computing hours
             scheduleData.rows.forEach(row => {
-                const employeeLogs = timeLogs.filter(log => log.EmployeeID === row.EmployeeID);
+                const empLogs = logsByEmployee[row.EmployeeID] || {};
                 const dailyHours = {};
-                employeeLogs.forEach(log => {
-                    if (log.ClockIn && log.ClockOut) {
-                        const clockInDate = new Date(log.ClockIn);
-                        const clockOutDate = new Date(log.ClockOut);
-                        const day = DAYS_OF_WEEK[clockInDate.getUTCDay()].toLowerCase();
-                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
-                        if (duration > 5) {
-                            duration -= 0.5;
+                Object.keys(empLogs).forEach(dayKey => {
+                    const chosen = pickLatestLogForGroup(empLogs[dayKey]);
+                    if (!chosen) return;
+                    // Support both old format (ClockIn / ClockOut) and new 4-field format
+                    if (chosen.ClockInAM || chosen.ClockOutLunch || chosen.ClockInLunch || chosen.ClockOutPM) {
+                        dailyHours[dayKey] = computeHoursFromFour(chosen);
+                    } else if (chosen.ClockIn && chosen.ClockOut) {
+                        // fallback single pair - no 30min deduction
+                        const ci = Date.parse(chosen.ClockIn);
+                        const co = Date.parse(chosen.ClockOut);
+                        if (!isNaN(ci) && !isNaN(co) && co > ci) {
+                            dailyHours[dayKey] = (co - ci) / (1000 * 60 * 60);
+                        } else {
+                            dailyHours[dayKey] = 0;
                         }
-                        dailyHours[day] = (dailyHours[day] || 0) + duration;
+                    } else {
+                        dailyHours[dayKey] = 0;
                     }
                 });
                 row.actualHours = dailyHours;
             });
 
+            // ensure store employees present
             const storeEmployees = allEmployees.filter(emp => emp.StoreID === selectedStore);
             const scheduleEmployeeIds = new Set(scheduleData.rows.map(r => r.EmployeeID));
             storeEmployees.forEach(emp => {
@@ -217,7 +311,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             fetchSchedule();
         }
     }, [selectedStore, currentWeek, currentYear, allEmployees]);
-    
+
+    /* ---------------------- row handlers ---------------------- */
     const handleRowChange = (id, field, value, day) => {
         const newRows = schedule.rows.map(row => {
             if (row.EmployeeID === id) {
@@ -233,8 +328,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     };
 
     const handleAddRow = () => {
-        // <-- change: mark manual-created rows as editable via isNew flag
-        const newRow = { EmployeeID: `new_${Date.now()}`, Name: '', PositionID: '', JobTitle: JOB_TITLES[0], objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}, isNew: true };
+        const newRow = { EmployeeID: `new_${Date.now()}`, Name: '', PositionID: '', JobTitle: JOB_TITLES[0], objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} };
         setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
     };
 
@@ -283,36 +377,42 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         }
         setIsConfirmModalOpen(false);
     };
-    
+
+    /* ---------------------- finalize/week ---------------------- */
     const handleFinalizeWeek = () => setIsConfirmModalOpen(true);
     const handleConfirmFinalize = () => {
         executeSaveSchedule(true);
     };
 
-    const handleTimeAdjustmentSave = async ({ clockIn, clockOut, reason }) => {
+    /* ---------------------- Time adjustments (overwrite logic) ---------------------- */
+    const parseTimeToDate = (timeStr, baseDate) => {
+        if (!timeStr) return null;
+        const isPm = timeStr.toLowerCase().includes('pm');
+        const isAm = timeStr.toLowerCase().includes('am');
+        let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(n => Number(n));
+        minutes = minutes || 0;
+        if (isNaN(hours)) return null;
+        if (isPm && hours < 12) hours += 12;
+        if (isAm && hours === 12) hours = 0;
+        return new Date(Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hours, minutes));
+    };
+
+    const handleTimeAdjustmentSave = async ({ clockInAM, clockOutLunch, clockInLunch, clockOutPM, reason }) => {
         if (!timeAdjustmentData) return;
         const { row, dayIndex } = timeAdjustmentData;
-        
+
+        // compute base date (weekStart + dayIndex)
         const weekStartDate = new Date(currentDate);
         const currentDayOfWeek = weekStartDate.getUTCDay();
         weekStartDate.setUTCDate(weekStartDate.getUTCDate() - currentDayOfWeek + dayIndex);
 
-        const parseTime = (timeStr) => {
-            const isPm = timeStr.toLowerCase().includes('pm');
-            const isAm = timeStr.toLowerCase().includes('am');
-            let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(Number);
-            minutes = minutes || 0;
-            if (isPm && hours < 12) hours += 12;
-            if (isAm && hours === 12) hours = 0; // Midnight case
-            return { hours, minutes };
-        };
+        // parse times into ISO strings (if provided)
+        const ciAM = parseTimeToDate(clockInAM, weekStartDate);
+        const coLunch = parseTimeToDate(clockOutLunch, weekStartDate);
+        const ciLunch = parseTimeToDate(clockInLunch, weekStartDate);
+        const coPM = parseTimeToDate(clockOutPM, weekStartDate);
 
-        const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
-        const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
-
-        const clockInDate = new Date(Date.UTC(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate(), inHours, inMinutes));
-        const clockOutDate = new Date(Date.UTC(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate(), outHours, outMinutes));
-
+        // Build payload - send to /timelog/adjust (keeps existing API)
         try {
             await fetch(`${API_BASE_URL}/timelog/adjust`, {
                 method: 'POST',
@@ -320,29 +420,54 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 body: JSON.stringify({
                     employeeId: row.EmployeeID,
                     storeId: selectedStore,
-                    clockIn: clockInDate.toISOString(),
-                    clockOut: clockOutDate.toISOString(),
                     week: currentWeek,
                     year: currentYear,
-                    notes: reason,
+                    dayIndex,
+                    ClockInAM: ciAM ? ciAM.toISOString() : null,
+                    ClockOutLunch: coLunch ? coLunch.toISOString() : null,
+                    ClockInLunch: ciLunch ? ciLunch.toISOString() : null,
+                    ClockOutPM: coPM ? coPM.toISOString() : null,
+                    notes: reason
                 })
             });
-            setNotification({ message: "Time adjustment saved.", type: 'success' });
-            fetchSchedule(); 
+
+            // Overwrite local schedule.actualHours for that day (no stacking)
+            const dayKey = DAYS_OF_WEEK[dayIndex].toLowerCase();
+            const newRows = (schedule.rows || []).map(r => {
+                if (r.EmployeeID !== row.EmployeeID) return r;
+                const newActualHours = { ...(r.actualHours || {}) };
+                newActualHours[dayKey] = computeHoursFromFour({
+                    ClockInAM: ciAM ? ciAM.toISOString() : null,
+                    ClockOutLunch: coLunch ? coLunch.toISOString() : null,
+                    ClockInLunch: ciLunch ? ciLunch.toISOString() : null,
+                    ClockOutPM: coPM ? coPM.toISOString() : null
+                });
+                return { ...r, actualHours: newActualHours };
+            });
+            setSchedule(prev => ({ ...prev, rows: newRows }));
+
+            setNotification({ message: t.timeAdjustmentSaved || 'Time adjustment saved.', type: 'success' });
+            fetchSchedule(); // refresh from server to guarantee consistency
         } catch (error) {
             console.error("Error saving time adjustment:", error);
-            setNotification({ message: "Error saving adjustment.", type: 'error' });
+            setNotification({ message: t.errorSavingAdjustment || 'Error saving adjustment.', type: 'error' });
         }
     };
-    
+
     const handleManagerPasscodeSuccess = () => {
         setIsManagerPasscodeOpen(false);
         setTimeAdjustmentData(prev => ({...prev, authorized: true }));
     };
 
+    /* ---------------------- PDF (unchanged behavior but kept) ---------------------- */
     const handleDownloadPdf = () => {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+        const { jsPDF } = window.jspdf || {};
+        // if jspdf not available, warn
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('PDF library not loaded.');
+            return;
+        }
+        const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
     
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
@@ -394,10 +519,9 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             const subHeaderTextWidth = doc.getStringUnitWidth(subHeaderText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
             doc.text(subHeaderText, doc.internal.pageSize.getWidth() - data.settings.margin.right - subHeaderTextWidth, 55);
 
-            // Footer
+            // Footer (no page numbering requested earlier)
             doc.setFontSize(10);
-            const pageNumText = `Page ${data.pageNumber}`;
-            doc.text(pageNumText, data.settings.margin.left, doc.internal.pageSize.getHeight() - 20);
+            // no page number
         };
     
         doc.autoTable({
@@ -426,7 +550,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             }
         });
         
-        const finalY = doc.autoTable.previous.finalY;
+        const finalY = doc.autoTable.previous?.finalY || 70;
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         const footerText = `${t.totalStoreHours || 'Total Store Hours'}: ${decimalHoursToHM(totalScheduledHoursWeek)}`;
@@ -440,6 +564,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
+    /* ---------------------- Render ---------------------- */
     return (
         <>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
@@ -476,34 +601,37 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                             {schedule.rows.map(row => {
                                 const totalScheduledHours = Object.values(row.shifts || {}).reduce((sum, s) => sum + parseShift(s), 0);
                                 const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
+
+                                const isManual = String(row.EmployeeID || '').startsWith('new_') || row.isGuest;
+
                                 return (
                                     <tr key={row.EmployeeID}>
                                         <td className="px-4 py-2">
-                                            <input 
-                                                type="text" 
-                                                placeholder="ID" 
-                                                value={row.PositionID || ''} 
-                                                onChange={(e) => handleRowChange(row.EmployeeID, 'PositionID', e.target.value)} 
-                                                readOnly={!row.isNew}
-                                                className={`w-24 border rounded-md px-2 py-1 ${row.isNew ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                                            <input
+                                                type="text"
+                                                placeholder="ID"
+                                                value={row.PositionID || ''}
+                                                readOnly={!isManual}
+                                                onChange={(e) => isManual && handleRowChange(row.EmployeeID, 'PositionID', e.target.value)}
+                                                className={`w-24 ${isManual ? 'bg-gray-700' : 'bg-gray-700'} border border-gray-600 rounded-md px-2 py-1`}
                                             />
                                         </td>
                                         <td className="px-4 py-2">
-                                            <input 
-                                                type="text" 
-                                                placeholder={t.enterName} 
-                                                value={row.Name || ''} 
-                                                onChange={(e) => handleRowChange(row.EmployeeID, 'Name', e.target.value)} 
-                                                readOnly={!row.isNew}
-                                                className={`w-40 border rounded-md px-2 py-1 ${row.isNew ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                                            <input
+                                                type="text"
+                                                placeholder={t.enterName}
+                                                value={row.Name || ''}
+                                                readOnly={!isManual}
+                                                onChange={(e) => isManual && handleRowChange(row.EmployeeID, 'Name', e.target.value)}
+                                                className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1"
                                             />
                                         </td>
                                         <td className="px-4 py-2">
-                                            <select 
-                                                value={row.JobTitle} 
-                                                onChange={(e) => handleRowChange(row.EmployeeID, 'JobTitle', e.target.value)}
-                                                disabled={!row.isNew}
-                                                className={`w-40 border rounded-md px-2 py-1 ${row.isNew ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                                            <select
+                                                value={row.JobTitle}
+                                                readOnly={!isManual}
+                                                onChange={(e) => isManual && handleRowChange(row.EmployeeID, 'JobTitle', e.target.value)}
+                                                className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1"
                                             >
                                                 {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
                                             </select>
@@ -582,7 +710,9 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     </div>
                 </div>
             </div>
+
             {editingObjectivesFor && <DailyObjectiveModal t={t} language={language} row={editingObjectivesFor} onRowChange={handleRowChange} onClose={() => setEditingObjectivesFor(null)} />}
+
             <AddGuestAssociateModal 
                 isOpen={isGuestModalOpen}
                 onClose={() => setIsGuestModalOpen(false)}
@@ -591,6 +721,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 currentScheduleRows={schedule.rows}
                 t={t}
             />
+
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
                 onClose={() => setIsConfirmModalOpen(false)}
@@ -600,6 +731,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
             >
                 <p>{t.confirmLockWeek}</p>
             </ConfirmationModal>
+
             {isManagerPasscodeOpen && (
                 <PasscodeModal 
                     onSuccess={handleManagerPasscodeSuccess} 
@@ -609,6 +741,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     isManagerCheck={true}
                 />
             )}
+
             {timeAdjustmentData && (
                 <TimeAdjustmentModal 
                     isOpen={!!timeAdjustmentData}
