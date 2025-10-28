@@ -233,7 +233,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
     };
 
     const handleAddRow = () => {
-        const newRow = { EmployeeID: `new_${Date.now()}`, Name: '', PositionID: '', JobTitle: JOB_TITLES[0], objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {} };
+        // <-- change: mark manual-created rows as editable via isNew flag
+        const newRow = { EmployeeID: `new_${Date.now()}`, Name: '', PositionID: '', JobTitle: JOB_TITLES[0], objective: 0, shifts: {}, actualHours: {}, dailyObjectives: {}, isNew: true };
         setSchedule(prev => ({...prev, rows: [...prev.rows, newRow]}));
     };
 
@@ -477,10 +478,33 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                                 const totalActualHours = Object.values(row.actualHours || {}).reduce((sum, h) => sum + (Number(h) || 0), 0);
                                 return (
                                     <tr key={row.EmployeeID}>
-                                        <td className="px-4 py-2"><input type="text" placeholder="ID" value={row.PositionID || ''} readOnly className="w-24 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
-                                        <td className="px-4 py-2"><input type="text" placeholder={t.enterName} value={row.Name || ''} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1" /></td>
                                         <td className="px-4 py-2">
-                                            <select value={row.JobTitle} readOnly className="w-40 bg-gray-700 border border-gray-600 rounded-md px-2 py-1">
+                                            <input 
+                                                type="text" 
+                                                placeholder="ID" 
+                                                value={row.PositionID || ''} 
+                                                onChange={(e) => handleRowChange(row.EmployeeID, 'PositionID', e.target.value)} 
+                                                readOnly={!row.isNew}
+                                                className={`w-24 border rounded-md px-2 py-1 ${row.isNew ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder={t.enterName} 
+                                                value={row.Name || ''} 
+                                                onChange={(e) => handleRowChange(row.EmployeeID, 'Name', e.target.value)} 
+                                                readOnly={!row.isNew}
+                                                className={`w-40 border rounded-md px-2 py-1 ${row.isNew ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <select 
+                                                value={row.JobTitle} 
+                                                onChange={(e) => handleRowChange(row.EmployeeID, 'JobTitle', e.target.value)}
+                                                disabled={!row.isNew}
+                                                className={`w-40 border rounded-md px-2 py-1 ${row.isNew ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                                            >
                                                 {JOB_TITLES.map(title => <option key={title} value={title}>{title}</option>)}
                                             </select>
                                         </td>
