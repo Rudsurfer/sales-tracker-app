@@ -664,18 +664,19 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     isManagerCheck={true}
                 />
             )}
-            {timeAdjustmentData && (
-                <TimeAdjustmentModal 
-                    isOpen={!!timeAdjustmentData}
-                    onClose={() => setTimeAdjustmentData(null)}
-                    onSave={handleTimeAdjustmentSave}
-                    employeeName={timeAdjustmentData.row.Name}
-                    day={timeAdjustmentData.day}
-                    t={t}
+            {timeAdjustmentData?.authorized && timeAdjustmentData?.row && (
+  <TimeAdjustmentModal
+    isOpen={!!timeAdjustmentData}
+    onClose={() => setTimeAdjustmentData(null)}
+    onSave={handleTimeAdjustmentSave}
+    employeeName={timeAdjustmentData.row.Name}
+    day={timeAdjustmentData.day}
+    t={t}
                 />
             )}
         </>
     );
 };
+
 
 
