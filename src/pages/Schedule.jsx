@@ -505,16 +505,18 @@ export const Schedule = ({
                             onChange={e => handleRowChange(row.EmployeeID, 'shifts', e.target.value, key)}
                             className="w-24 border border-gray-600 rounded-md px-2 py-1 text-center bg-gray-900/70" />
                           <div className="text-xs text-gray-400 mt-1">({hrs.toFixed(2)})</div>
-                          <div className="text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-md mt-1 p-1">
-                            {decimalHoursToHM(row.actualHours[key] || 0)}
-                          </div>
-                          <button onClick={() => {
-                            setTimeAdjustmentData({ row, dayIndex: dayIdx, day: weekDays[dayIdx] });
-                            setIsManagerPasscodeOpen(true);
-                          }}
-                            className="text-gray-500 hover:text-white text-xs mt-1 flex items-center justify-center gap-1">
-                            <Edit2 size={12} /> {t.adjust}
-                          </button>
+                          <div className="relative w-24 border border-gray-600 rounded-md px-2 py-1 text-center bg-gray-900/70 flex items-center justify-center text-xs text-gray-300 mt-1 h-8">
+  <span>{decimalHoursToHM(row.actualHours[key] || 0)}</span>
+  <button
+    onClick={() => {
+      setTimeAdjustmentData({ row, dayIndex: dayIdx, day: weekDays[dayIdx] });
+      setIsManagerPasscodeOpen(true);
+    }}
+    className="absolute right-1 text-gray-500 hover:text-white"
+    title={t.adjust}
+  >
+    <Edit2 size={12} />
+  </button>
                         </td>
                       );
                     })}
@@ -595,5 +597,4 @@ export const Schedule = ({
     </>
   );
 };
-
 
