@@ -358,8 +358,8 @@ export const Schedule = ({
     const { row, dayIndex } = timeAdjustmentData;
 
     const weekStart = new Date(currentDate);
-    const currentDay = weekStart.getUTCDay();
-    weekStart.setUTCDate(weekStart.getUTCDate() - currentDay + dayIndex);
+    const currentDay = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() - currentDay + dayIndex);
 
     const parseTime = (s) => {
       if (!s) return null;
@@ -375,7 +375,7 @@ export const Schedule = ({
     const parseToDate = (s) => {
       const t = parseTime(s);
       if (!t) return null;
-      return new Date(Date.UTC(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), t.h, t.m));
+      return new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), t.h, t.m);
     };
 
     const clockInDate = parseToDate(clockIn);
@@ -595,4 +595,5 @@ export const Schedule = ({
     </>
   );
 };
+
 
