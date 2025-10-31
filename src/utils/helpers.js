@@ -62,11 +62,11 @@ export const parseShift = (shift) => {
        }
     }
 
-    let duration = endTime - startTime;
-    if (duration < 0) duration += 24;
-    
-    // **This line has been changed to deduct 30 minutes (0.5 hours) for lunch.**
-    if (duration > 5) duration -= 0.5;
-    
-    return duration > 0 ? duration : 0;
+let duration = endTime - startTime;
+if (duration < 0) duration += 24;
+
+// Removed automatic 30-minute lunch deduction
+// Let managers manually control lunch adjustments through the Time Adjustment modal.
+
+return duration > 0 ? duration : 0;
 };
