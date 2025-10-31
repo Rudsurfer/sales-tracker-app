@@ -582,12 +582,11 @@ export const Schedule = ({
         />
       )}
 
-      {timeAdjustmentData?.authorized && (
+            {timeAdjustmentData?.authorized && (
         <TimeAdjustmentModal
           isOpen={!!timeAdjustmentData}
           onClose={() => setTimeAdjustmentData(null)}
           onSave={handleTimeAdjustmentSave}
-         ```jsx
           employeeName={timeAdjustmentData.row?.Name}
           day={timeAdjustmentData.day}
           t={t}
@@ -596,3 +595,4 @@ export const Schedule = ({
     </>
   );
 };
+
