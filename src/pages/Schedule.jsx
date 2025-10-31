@@ -97,38 +97,91 @@ const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) 
             alert(t.fillAllFields);
             return;
         }
-        onSave({ clockIn, clockOut, reason });
+       onSave({ clockIn, lunchOut, lunchIn, clockOut, reason });
         onClose();
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 no-print">
-            <div className="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">Time Adjustment for {employeeName} on {day}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
-                </div>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock In Time (e.g., 9:00am)</label>
-                        <input type="text" value={clockIn} onChange={e => setClockIn(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Clock Out Time (e.g., 5:30pm)</label>
-                        <input type="text" value={clockOut} onChange={e => setClockOut(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Reason for Adjustment</label>
-                        <textarea value={reason} onChange={e => setReason(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2" rows="3"></textarea>
-                    </div>
-                </div>
-                <div className="flex justify-end mt-6 space-x-4">
-                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">{t.cancel}</button>
-                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">{t.saveChanges}</button>
-                </div>
-            </div>
+       <div className="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50">
+      <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-white">
+            Time Adjustment for {employeeName} on {day}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={24} />
+          </button>
         </div>
-    );
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Clock In</label>
+            <input
+              type="text"
+              value={clockIn}
+              onChange={e => setClockIn(e.target.value)}
+              placeholder="e.g. 9:00 am"
+              className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Lunch Out</label>
+            <input
+              type="text"
+              value={lunchOut}
+              onChange={e => setLunchOut(e.target.value)}
+              placeholder="e.g. 12:30 pm"
+              className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Lunch In</label>
+            <input
+              type="text"
+              value={lunchIn}
+              onChange={e => setLunchIn(e.target.value)}
+              placeholder="e.g. 1:00 pm"
+              className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Clock Out</label>
+            <input
+              type="text"
+              value={clockOut}
+              onChange={e => setClockOut(e.target.value)}
+              placeholder="e.g. 5:30 pm"
+              className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Reason for Adjustment</label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2"
+              rows="3"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end mt-6 space-x-4">
+          <button
+            onClick={onClose}
+            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            {t.cancel}
+          </button>
+          <button
+            onClick={handleSave}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            {t.saveChanges}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear, currentDate, API_BASE_URL, setNotification, t, language }) => {
@@ -624,4 +677,5 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
