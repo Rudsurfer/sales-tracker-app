@@ -84,9 +84,11 @@ const AddGuestAssociateModal = ({ isOpen, onClose, onAdd, allEmployees, currentS
 };
 
 const TimeAdjustmentModal = ({ isOpen, onClose, onSave, employeeName, day, t }) => {
-    const [clockIn, setClockIn] = useState('');
-    const [clockOut, setClockOut] = useState('');
-    const [reason, setReason] = useState('');
+  const [clockIn, setClockIn] = useState('');
+  const [lunchOut, setLunchOut] = useState('');
+  const [lunchIn, setLunchIn] = useState('');
+  const [clockOut, setClockOut] = useState('');
+  const [reason, setReason] = useState('');
 
     if (!isOpen) return null;
 
@@ -622,3 +624,4 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
