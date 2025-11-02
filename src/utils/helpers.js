@@ -1,72 +1,101 @@
-// This file contains reusable helper functions used in various parts of the application.
+// ============================================================================
+// helpers.js — Common reusable utility functions
+// ============================================================================
 
+// ---------------------------------------------
+// Format a number as USD currency
+// ---------------------------------------------
 export const formatCurrency = (value) => {
-    const num = Number(value);
-    if (isNaN(num)) return '$0.00';
-    return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const num = Number(value);
+  if (isNaN(num)) return '$0.00';
+  return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 };
 
+// ---------------------------------------------
+// Fiscal week calculation (Week 1 starts Sunday, Feb 2, 2025)
+// ---------------------------------------------
 export const getWeekNumber = (d) => {
-    // Fiscal year definition based on user feedback: Week 1 of 2025 starts on Sunday, Feb 2, 2025.
-    const fiscalYearStart = new Date(Date.UTC(2025, 1, 2)); // Month is 0-indexed, so 1 is February.
+  // Define fiscal-year start (UTC)
+  const fiscalYearStart = new Date(Date.UTC(2025, 1, 2)); // Feb = 1 (0-indexed)
 
-    const date = new Date(d.valueOf());
-    date.setUTCHours(0, 0, 0, 0); // Use UTC to prevent timezone shifts from affecting the date.
+  // Normalize input date
+  const date = new Date(d.valueOf());
+  date.setUTCHours(0, 0, 0, 0);
 
-    // Calculate the start of the week (Sunday) for the given date.
-    const dayOfWeek = date.getUTCDay(); // Sunday = 0, Monday = 1, ...
-    const startOfWeek = new Date(date);
-    startOfWeek.setUTCDate(date.getUTCDate() - dayOfWeek);
+  // Get the Sunday of the current week
+  const dayOfWeek = date.getUTCDay(); // Sunday = 0
+  const startOfWeek = new Date(date);
+  startOfWeek.setUTCDate(date.getUTCDate() - dayOfWeek);
 
-    // Calculate the difference in milliseconds between the start of the current week and the fiscal year start.
-    const diffMillis = startOfWeek - fiscalYearStart;
+  // Align fiscal start to its own week start (Sunday)
+  const fiscalStartDay = fiscalYearStart.getUTCDay();
+  const fiscalStartWeek = new Date(fiscalYearStart);
+  fiscalStartWeek.setUTCDate(fiscalYearStart.getUTCDate() - fiscalStartDay);
 
-    // Convert the difference to days, then to weeks.
-    // We add 1 because the first week is Week 1, not Week 0.
-    const diffWeeks = Math.floor(diffMillis / (1000 * 60 * 60 * 24 * 7));
-    
-    return diffWeeks + 1;
+  // Calculate full week difference
+  const diffMillis = startOfWeek - fiscalStartWeek;
+  const diffWeeks = Math.floor(diffMillis / (1000 * 60 * 60 * 24 * 7));
+
+  // Week 1 begins on Feb 2, 2025
+  return diffWeeks + 1;
 };
 
+// ---------------------------------------------
+// Convert a week number to start/end dates
+// ---------------------------------------------
+export const getWeekRange = (weekNumber) => {
+  const fiscalYearStart = new Date(Date.UTC(2025, 1, 2)); // Feb 2, 2025
+  const startOfWeek = new Date(fiscalYearStart);
+  startOfWeek.setUTCDate(fiscalYearStart.getUTCDate() + (weekNumber - 1) * 7);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+  return { startOfWeek, endOfWeek };
+};
 
+// ---------------------------------------------
+// Parse shift time range string into total hours
+// ---------------------------------------------
 export const parseShift = (shift) => {
-    if (!shift || typeof shift !== 'string' || shift.toLowerCase() === 'off' || shift.toLowerCase() === 'o' || shift.toLowerCase() === 'vac' || shift.toLowerCase() === 'vacation') {
-        return 0;
+  if (
+    !shift ||
+    typeof shift !== 'string' ||
+    ['off', 'o', 'vac', 'vacation'].includes(shift.toLowerCase())
+  ) {
+    return 0;
+  }
+
+  const parts = shift.split(/[\-–]/);
+  if (parts.length !== 2) return 0;
+
+  const parseTime = (timeStr) => {
+    const original = timeStr.trim();
+    const isPm = original.toLowerCase().includes('pm');
+    const isAm = original.toLowerCase().includes('am');
+    let numericStr = original.replace(/am|pm/gi, '').trim();
+    let [hours, minutes] = numericStr.split(':').map(Number);
+    minutes = minutes || 0;
+    if (isNaN(hours)) return null;
+    if (isPm && hours < 12) hours += 12;
+    if (isAm && hours === 12) hours = 0;
+    return hours + minutes / 60;
+  };
+
+  let startTime = parseTime(parts[0]);
+  let endTime = parseTime(parts[1]);
+  if (startTime === null || endTime === null) return 0;
+
+  // Handle cases without AM/PM explicitly given
+  if (!parts[0].toLowerCase().match(/am|pm/) && !parts[1].toLowerCase().match(/am|pm/)) {
+    if (endTime <= startTime && endTime < 12) endTime += 12;
+    if (startTime < 7 && endTime > startTime) {
+      startTime += 12;
+      endTime += 12;
     }
-    const parts = shift.split(/[\-–]/);
-    if (parts.length !== 2) return 0;
+  }
 
-    const parseTime = (timeStr) => {
-        const originalTimeStr = timeStr.trim();
-        const isPm = originalTimeStr.toLowerCase().includes('pm');
-        const isAm = originalTimeStr.toLowerCase().includes('am');
-        let numericStr = originalTimeStr.replace(/am|pm/gi, '').trim();
-        let [hours, minutes] = numericStr.split(':').map(Number);
-        minutes = minutes || 0;
-        if (isNaN(hours)) return null;
-        if (isPm && hours < 12) hours += 12;
-        if (isAm && hours === 12) hours = 0;
-        return hours + minutes / 60;
-    };
+  let duration = endTime - startTime;
+  if (duration < 0) duration += 24;
 
-    let startTime = parseTime(parts[0]);
-    let endTime = parseTime(parts[1]);
-
-    if (startTime === null || endTime === null) return 0;
-
-    if (!parts[0].toLowerCase().match(/am|pm/) && !parts[1].toLowerCase().match(/am|pm/)) {
-       if (endTime <= startTime && endTime < 12) endTime += 12;
-       if (startTime < 7 && endTime > startTime) {
-           startTime += 12;
-           endTime += 12;
-       }
-    }
-
-let duration = endTime - startTime;
-if (duration < 0) duration += 24;
-
-// Removed automatic 30-minute lunch deduction
-// Let managers manually control lunch adjustments through the Time Adjustment modal.
-
-return duration > 0 ? duration : 0;
+  // No automatic lunch deduction — handled manually in adjustments
+  return duration > 0 ? duration : 0;
 };
