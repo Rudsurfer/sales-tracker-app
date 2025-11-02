@@ -400,9 +400,9 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
     
         const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        startOfWeek.setUTCDate(currentDate.getUTCDate() - currentDate.getUTCDay());
         const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
         const options = { month: 'short', day: 'numeric' };
         const locale = language === 'fr' ? 'fr-CA' : 'en-US';
         const dateRange = `${startOfWeek.toLocaleDateString(locale, options)} - ${endOfWeek.toLocaleDateString(locale, options)}`;
@@ -677,6 +677,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
 
 
