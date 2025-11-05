@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlusCircle, Trash2, Target, X, UserPlus, Download, Lock, Unlock, Edit2 } from 'lucide-react';
 import { SaveButton, ConfirmationModal } from '../components/ui';
@@ -234,15 +233,16 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                 const dailyHours = {};
                 employeeLogs.forEach(log => {
                     if (log.ClockIn && log.ClockOut) {
-                        const clockInDate = new Date(log.ClockIn);
-                        const clockOutDate = new Date(log.ClockOut);
-                        const day = DAYS_OF_WEEK[clockInDate.getUTCDay()].toLowerCase();
-                        let duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
-                        if (duration > 5) {
-                            duration -= 0.5;
-                        }
-                        dailyHours[day] = (dailyHours[day] || 0) + duration;
-                    }
+  const clockInDate = new Date(log.ClockIn);
+  const clockOutDate = new Date(log.ClockOut);
+  const day = DAYS_OF_WEEK[clockInDate.getUTCDay()].toLowerCase();
+
+  // Calculate total duration (no automatic lunch deduction)
+  const duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
+
+  dailyHours[day] = (dailyHours[day] || 0) + duration;
+}
+
                 });
                 row.actualHours = dailyHours;
             });
@@ -678,6 +678,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
 
 
