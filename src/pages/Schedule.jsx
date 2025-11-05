@@ -380,7 +380,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     clockOut: clockOutDate.toISOString(),
                     week: currentWeek,
                     year: currentYear,
-                    notes: reason,
+                    reason,
                 })
             });
             setNotification({ message: "Time adjustment saved.", type: 'success' });
@@ -678,6 +678,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
 
 
