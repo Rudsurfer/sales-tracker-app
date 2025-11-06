@@ -244,7 +244,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
                     if (log.ClockIn && log.ClockOut) {
   const clockInDate = new Date(log.ClockIn);
   const clockOutDate = new Date(log.ClockOut);
-  const day = DAYS_OF_WEEK[clockInDate.getUTCDay()].toLowerCase();
+  const day = DAYS_OF_WEEK[getLocalDayIndex(clockInDate)].toLowerCase();
 
   // Calculate total duration (no automatic lunch deduction)
   const duration = (clockOutDate - clockInDate) / (1000 * 60 * 60);
@@ -362,15 +362,16 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         const currentDayOfWeek = weekStartDate.getUTCDay();
         weekStartDate.setUTCDate(weekStartDate.getUTCDate() - currentDayOfWeek + dayIndex);
 
-        const parseTime = (timeStr) => {
-            const isPm = timeStr.toLowerCase().includes('pm');
-            const isAm = timeStr.toLowerCase().includes('am');
-            let [hours, minutes] = timeStr.replace(/am|pm/gi, '').trim().split(':').map(Number);
-            minutes = minutes || 0;
-            if (isPm && hours < 12) hours += 12;
-            if (isAm && hours === 12) hours = 0; // Midnight case
-            return { hours, minutes };
-        };
+       const parseTime = (s) => {
+  const str = s.trim().toLowerCase();
+  const pm = str.includes('pm');
+  const am = str.includes('am');
+  let [h, m] = str.replace(/am|pm/gi, '').trim().split(':').map(Number);
+  m = m || 0;
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  return { h, m };
+};
 
         const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
         const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
@@ -687,6 +688,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
 
 
