@@ -373,8 +373,8 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
   return { h, m };
 };
 
-        const { hours: inHours, minutes: inMinutes } = parseTime(clockIn);
-        const { hours: outHours, minutes: outMinutes } = parseTime(clockOut);
+        const { h: inHours, m: inMinutes } = parseTime(clockIn);
+        const { h: outHours, m: outMinutes } = parseTime(clockOut);
 
         const clockInDate = new Date(Date.UTC(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate(), inHours, inMinutes));
         const clockOutDate = new Date(Date.UTC(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate(), outHours, outMinutes));
@@ -688,6 +688,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
 
 
