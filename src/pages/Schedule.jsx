@@ -5,6 +5,15 @@ import { PasscodeModal } from '../components/PasscodeModal';
 import { DAYS_OF_WEEK, DAYS_OF_WEEK_FR, JOB_TITLES } from '../constants';
 import { parseShift } from '../utils/helpers';
 
+// --- UTC-safe date helpers ---
+const makeUtcFromLocalParts = (y, m, d, hh, mm) => {
+  const local = new Date(y, m, d, hh, mm, 0, 0);
+  return new Date(local.getTime() - local.getTimezoneOffset() * 60000);
+};
+
+const getLocalDayIndex = (d) =>
+  new Date(d.getTime() - d.getTimezoneOffset() * 60000).getUTCDay();
+
 const decimalHoursToHM = (decimalHours) => {
     if (!decimalHours || decimalHours <= 0) return "0h 0m";
     const totalMinutes = Math.round(decimalHours * 60);
@@ -678,6 +687,7 @@ export const Schedule = ({ allEmployees, selectedStore, currentWeek, currentYear
         </>
     );
 };
+
 
 
 
